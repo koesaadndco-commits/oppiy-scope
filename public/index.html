@@ -197,6 +197,20 @@ table.t td.n{font-family:var(--f-mono);text-align:right}
 .banner{background:var(--accent-soft);color:var(--ink);border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:14px}
 .hidden{display:none!important}
 .kicker{font-family:var(--f-mono);font-size:11px;letter-spacing:.16em;color:var(--muted);font-weight:600;text-transform:uppercase}
+.why .how{color:var(--muted);font-size:12px;line-height:1.5}
+.why td.m{font-family:var(--f-mono);white-space:nowrap}
+.printhead{display:none}
+html.print{color-scheme:light;--bg:#fff;--bg2:#fff;--surface:#fff;--surface2:#f1eef5;--ink:#141018;--muted:#5d5568;--line:#d8d2e2;--accent:#d61c6a;--accent2:#b86f00;--accent-soft:#fde4ee;--beat:#0d8fa0;--beat-soft:#dff6f9;--good:#1f9b57;--warn:#9a6a00;--bad:#d33;--stage:#fff;--stage-ink:#141018}
+@media print{
+  body.printing *{visibility:hidden}
+  body.printing .print-target,body.printing .print-target *{visibility:visible}
+  body.printing .print-target{position:absolute;left:0;top:0;width:100%;margin:0;padding:0 8mm}
+  body.printing .print-target button,body.printing .print-target select,body.printing .print-target [data-export]{display:none!important}
+  body.printing .printhead{display:block}
+  *{box-shadow:none!important;text-shadow:none!important}
+  .panel,.sec,.tablewrap{break-inside:avoid}
+  @page{margin:12mm}
+}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -276,6 +290,7 @@ table.t td.n{font-family:var(--f-mono);text-align:right}
             <button class="btn ghost hidden" id="stopBtn">中止</button>
           </div>
           <p class="note" id="setupNote" style="margin:10px 0 0">動画を選ぶと解析できます。初回はAIモデル(約25MB)の読み込みに少し時間がかかります。</p>
+          <p class="note hidden" id="audioNote" style="margin:6px 0 0"></p>
         </div>
 
         <div class="panel hidden" id="scorePanel">
@@ -285,6 +300,7 @@ table.t td.n{font-family:var(--f-mono);text-align:right}
           </div>
           <div class="total"><div class="num" id="totalNum">–</div><div class="meta"><span>総合スコア</span><b id="totalTitle"></b><span id="totalSub"></span></div></div>
           <div class="metrics" id="metrics"></div>
+          <p class="note hidden" id="scoreNote" style="margin:12px 0 0"></p>
           <div class="row" style="margin-top:16px" id="saveRow">
             <label class="refcheck"><input type="checkbox" id="fIsRef"> 見本として登録する</label>
             <button class="btn primary" id="saveBtn">記録に保存</button>
@@ -304,6 +320,7 @@ table.t td.n{font-family:var(--f-mono);text-align:right}
       <label class="f">ダンサー/チームで絞り込み<select id="hFilter"><option value="">すべて</option></select></label>
       <label class="f">並び順<select id="hSort"><option value="date">新しい順</option><option value="score">スコア順</option></select></label>
       <span class="grow"></span>
+      <button class="btn sm ghost" id="exportCsv">CSVで書き出し</button>
       <button class="btn sm ghost hidden" id="clearSamples">サンプルを消す</button>
     </div>
     <div class="list" id="hList"></div>
@@ -494,6 +511,7 @@ function loadVideo(f) {
     $("#setupNote").textContent = `${W}×${H}・${vid.duration.toFixed(1)}秒。最大180秒まで解析できます。`;
     $("#progText").textContent = "準備OK";
     vid.currentTime = Math.min(0.5, vid.duration / 2);
+    checkAudio(f);
   };
   vid.onseeked = () => { if (!analyzing) drawFrame(nearestFrame(vid.currentTime)); };
   $("#scorePanel").classList.add("hidden"); $("#resultDetail").classList.add("hidden");
@@ -615,7 +633,31 @@ vid.addEventListener("pause", () => { playing = false; $("#playBtn").textContent
 function loop() { if (!playing) return; drawFrame(nearestFrame(vid.currentTime)); requestAnimationFrame(loop); }
 
 /* ---------- audio: tempo + beats ---------- */
+/* 音声が取れなかった理由。rec.audioStatus に保存し、画面で原因と対処を出す */
+let audioStatus = null;
+const AUDIO_INFO = {
+  decode_failed: { why: "動画に音声が入っていないか、この形式の音声をブラウザが読めませんでした。", fix: "音が入った状態で撮り直すか、動画編集アプリで曲を乗せてから書き出してください(MP4/MOV・AAC音声が確実)。" },
+  too_short: { why: "解析した範囲が4秒未満でした。", fix: "開始〜終了を4秒以上にしてください。" },
+  few_beats: { why: "音はありましたが、拍をはっきり取れませんでした(曲の音が小さい・話し声だけ・拍の弱い曲)。", fix: "曲の音量を上げる、スピーカーをカメラの近くに置く、イントロや話し声だけの区間を避けて範囲を選ぶ、のどれかを試してください。" },
+  unknown: { why: "音声が取れませんでした。", fix: "音が入った動画で、範囲を4秒以上にして解析してください。" },
+};
+const audioInfo = st => AUDIO_INFO[st] || AUDIO_INFO.unknown;
+/* 動画を選んだ直後に音声の有無だけ先に確かめる(解析前に気づけるように) */
+async function checkAudio(file) {
+  const el = $("#audioNote"); el.classList.remove("hidden"); el.textContent = "音声を確認中…";
+  try {
+    const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const audio = await new AC(1, 44100, 44100).decodeAudioData(await file.arrayBuffer());
+    if (videoFile !== file) return;
+    el.textContent = `音声:あり(${audio.numberOfChannels}ch・${audio.duration.toFixed(0)}秒)。テンポと音ハメを計測できます。`;
+  } catch (e) {
+    if (videoFile !== file) return;
+    const i = AUDIO_INFO.decode_failed;
+    el.textContent = `音声:検出できず。${i.why} このまま解析すると「音ハメ」は未計測になります。対処:${i.fix}`;
+  }
+}
 async function analyzeAudio(file, t0, t1) {
+  audioStatus = null;
   try {
     const buf = await file.arrayBuffer();
     const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
@@ -623,7 +665,7 @@ async function analyzeAudio(file, t0, t1) {
     const audio = await ac.decodeAudioData(buf);
     const sr = audio.sampleRate, ch = audio.numberOfChannels;
     const a = Math.floor(t0 * sr), b = Math.min(audio.length, Math.floor(t1 * sr));
-    if (b - a < sr * 4) return null;
+    if (b - a < sr * 4) { audioStatus = "too_short"; return null; }
     const mono = new Float32Array(b - a);
     for (let c = 0; c < ch; c++) { const d = audio.getChannelData(c); for (let i = a; i < b; i++) mono[i - a] += d[i] / ch; }
     const hop = 512, fr = sr / hop, n = Math.floor(mono.length / hop) - 1;
@@ -653,7 +695,7 @@ async function analyzeAudio(file, t0, t1) {
     for (let p = 0; p < period; p += 0.5) { let s = 0; for (let x = p; x < n; x += period) s += ons[Math.round(x)] || 0; if (s > bp) { bp = s; bestP = p; } }
     const beats = []; for (let x = bestP; x < n; x += period) beats.push(t0 + x / fr);
     return { bpm: Math.round(bpm * 10) / 10, beats };
-  } catch (e) { console.warn("audio", e); return null; }
+  } catch (e) { console.warn("audio", e); audioStatus = "decode_failed"; return null; }
 }
 
 /* ---------- run analysis ---------- */
@@ -774,9 +816,10 @@ function computeMetrics(frames, fps, audio) {
   }
 
   // otohame
-  let otohame = null, onBeat = 0, grid = null, gridOffset = 0;
+  let otohame = null, onBeat = 0, grid = null, gridOffset = 0, oW = null, oExp = null;
+  if (audio && audio.beats.length <= 8) audioStatus = "few_beats";
   if (audio && audio.beats.length > 8) {
-    const ibi = 60 / audio.bpm, w = Math.max(0.1, 0.6 / fps);
+    const ibi = 60 / audio.bpm, w = Math.max(0.1, 0.6 / fps); oW = w; oExp = Math.min(0.9, 2 * w / ibi);
     const near = t => { let d = Infinity; for (const b of audio.beats) { const x = Math.abs(b - t); if (x < d) d = x; } return d; };
     onBeat = hits.filter(t => near(t) <= w).length;
     if (hits.length >= 4) {
@@ -814,6 +857,17 @@ function computeMetrics(frames, fps, audio) {
   const sizeOf = s => clamp(1 - Math.exp(-s / 0.6)) * 100;
   const meriOf = c => clamp((c - 1.2) / 3.3) * 100;
   const rangeOf = r => clamp((r - 0.3) / 2.2) * 100;
+  // why: 各指標の計測値と換算のしかた(画面の「各指標の根拠」とCSVに出す)
+  const gm = f => mean(per.map(f)), perV = f => per.map(p => { const v = f(p); return Number.isFinite(v) ? r3(v) : null; });
+  const why = {
+    size: { measured: r3(gm(p => p.speed)), unit: "身長/秒", per: perV(p => p.speed), how: "関節17点が1秒間に動いた距離の平均(身長を1として換算)。0.6で約63点、1.2で約86点、2.0で約96点。" },
+    merihari: { measured: r3(gm(p => p.contrast)), unit: "倍", per: perV(p => p.contrast), how: "速い瞬間(上位10%)の速さ ÷ 遅い瞬間(下位25%)の速さ。差が大きいほど「止め」が効いている。1.2倍で0点、4.5倍で100点。" },
+    otohame: !audio ? { reason: audioStatus || "unknown" } : audio.beats.length <= 8 ? { reason: "few_beats" } : hits.length < 4 ? { reason: "few_hits", measured: hits.length, unit: "回" } :
+      { measured: r3(onBeat / hits.length), unit: "割合", how: `動きを止めた「決め」${hits.length}回のうち、拍の±${Math.round(oW * 1000)}ミリ秒以内に入ったのが${onBeat}回(${Math.round(100 * onBeat / hits.length)}%)。偶然でも当たる割合(${Math.round(oExp * 100)}%)を引いて0〜100に換算。` },
+    range: { measured: r3(gm(p => p.range)), unit: "身長", per: perV(p => p.range), how: "両手首・両足首が腰の中心から届いた範囲(横幅+縦幅。極端な5%は除く)の平均。身長の0.3倍で0点、2.5倍で100点。" },
+    balance: { measured: r3(gm(p => p.balance)), unit: "比", per: perV(p => p.balance), how: "左半身と右半身の動いた量の比(小さい方 ÷ 大きい方)。1.0なら左右まったく同じで100点、0.7なら70点。" },
+    sync: per.length < 2 ? { reason: "one_person" } : { measured: r3(mean(pairR.flat())), unit: "相関", per: perV((p, i) => pairR[per.indexOf(p)].length ? mean(pairR[per.indexOf(p)]) : NaN), how: "8か所の関節角度の動きを全員のペアで比べた相関係数の平均。0.8以上で100点、0以下で0点。" },
+  };
   const dancers = per.map((p, i) => ({
     label: p.label, presence: r3(p.presence),
     size: Math.round(sizeOf(p.speed)), merihari: Math.round(meriOf(p.contrast)), range: Math.round(rangeOf(p.range)),
@@ -846,7 +900,7 @@ function computeMetrics(frames, fps, audio) {
     mean: pack((j, i) => mean(per.map(p => Math.abs(p.angles[j][i])))),
     energy: (() => { const o = []; for (let i = 0; i < n; i += step) o.push(r3(Es[i] || 0)); return o; })(),
   };
-  return { scores, dancers, energy, energyStep: bin / fps, hits: hits.map(r3), onBeat, grid, gridOffset, people: per.length, angleStore };
+  return { scores, dancers, energy, energyStep: bin / fps, hits: hits.map(r3), onBeat, grid, gridOffset, people: per.length, angleStore, why };
 }
 
 function makeThumb() {
@@ -863,6 +917,7 @@ function buildRecord(m, o) {
     people: m.people, scores: m.scores, dancers: m.dancers, energy: m.energy, energyStep: m.energyStep,
     hits: m.hits, onBeat: m.onBeat, grid: m.grid, gridOffset: m.gridOffset, thumb: makeThumb(), coach: "", sample: false,
     angles: m.angleStore, isRef: false, refId: null, compare: null,
+    why: m.why, audioStatus: o.audio ? null : (audioStatus || "unknown"),
   };
 }
 
@@ -880,10 +935,13 @@ function renderResult(rec, { target, fresh, id }) {
     $("#totalSub").textContent = `${rec.dancer}・${rec.people}人・${rec.duration.toFixed(1)}秒`;
     $("#scoreChips").innerHTML = (rec.bpm ? `<span class="chip beat">BPM ${rec.bpm}</span>` : `<span class="chip">音声なし</span>`) + `<span class="chip acc">${rec.fps}コマ/秒</span>`;
     $("#metrics").innerHTML = metricRows(rec.scores);
+    const sn = $("#scoreNote"); sn.classList.toggle("hidden", !!rec.bpm);
+    if (!rec.bpm) { const i = audioInfo(rec.audioStatus); sn.textContent = `音ハメが未計測です。${i.why} 対処:${i.fix}`; }
     $("#saveRow").classList.toggle("hidden", !fresh);
     $("#saveBtn").disabled = !canWrite; $("#saveNote").textContent = canWrite ? "" : "閲覧のみの権限のため保存できません";
   }
   const host = target === "analyze" ? $("#resultDetail") : $("#historyDetail");
+  host._renderOpts = { target, fresh, id };
   host.classList.remove("hidden");
   host.innerHTML = detailHTML(rec, target !== "analyze", id);
   drawEnergy(host.querySelector("canvas.energy"), rec);
@@ -894,6 +952,8 @@ function renderResult(rec, { target, fresh, id }) {
   ]);
   drawDancerBars(host.querySelector("canvas.dbars"), rec);
   wireCompare(host, rec, id);
+  host.querySelector("[data-csv]")?.addEventListener("click", () => downloadText(csvName([rec]), toCSV([rec])));
+  host.querySelector("[data-print]")?.addEventListener("click", () => printRecord(host, rec));
   host.querySelector("[data-refmark]")?.addEventListener("click", async e => {
     const b = e.currentTarget; b.disabled = true;
     try { await db.collection("analyses").doc(id).update({ isRef: !rec.isRef }); rec.isRef = !rec.isRef; b.textContent = rec.isRef ? "見本から外す" : "見本にする"; } catch { b.textContent = "変更できませんでした"; }
@@ -915,7 +975,7 @@ function insights(rec) {
   const top = avail[0], low = avail[avail.length - 1];
   const lines = [`いちばん良いのは「${top.name}」(${top.v})。`];
   if (low !== top) lines.push(`伸びしろは「${low.name}」(${low.v})。`);
-  if (rec.scores.otohame == null && rec.bpm == null) lines.push("音声が取れなかったため音ハメは未計測です。");
+  if (rec.scores.otohame == null && rec.bpm == null) lines.push(`音ハメは未計測(${audioInfo(rec.audioStatus).why})。`);
   if (rec.people >= 2 && rec.dancers.some(d => d.sync != null)) {
     const off = [...rec.dancers].filter(d => d.sync != null).sort((a, b) => a.sync - b.sync)[0];
     if (off) lines.push(`揃いが一番低いのは ${off.label}(${off.sync})。`);
@@ -938,7 +998,12 @@ function detailHTML(rec, standalone, id) {
     <div class="tablewrap panel" style="padding:6px 10px"><table class="t"><thead><tr><th>ダンサー</th><th>映っていた割合</th><th>動きの大きさ</th><th>メリハリ</th><th>可動域</th><th>左右バランス</th><th>揃い</th></tr></thead><tbody>
     ${rec.dancers.map((d, i) => `<tr><td><span class="dot" style="background:${DANCER_COLORS[i % 8]};color:${DANCER_COLORS[i % 8]}"></span><b>${d.label}</b></td><td class="n">${Math.round(d.presence * 100)}%</td><td class="n">${d.size ?? "—"}</td><td class="n">${d.merihari ?? "—"}</td><td class="n">${d.range ?? "—"}</td><td class="n">${d.balance ?? "—"}</td><td class="n">${d.sync ?? "—"}</td></tr>`).join("")}
     </tbody></table></div></div>` : "";
-  const grid = rec.grid && rec.grid.length ? eightsHTML(rec) : `<div class="empty">音声からテンポを取れなかったため、カウント表は表示できません。</div>`;
+  const grid = rec.grid && rec.grid.length ? eightsHTML(rec) : `<div class="empty">カウント表は表示できません。${esc(audioInfo(rec.audioStatus).why)}<br>対処:${esc(audioInfo(rec.audioStatus).fix)}</div>`;
+  const printhead = standalone ? "" : `<div class="printhead panel">
+      <span class="kicker">${fmtDate(rec.date)}・${esc(rec.dancer)}</span>
+      <div class="total" style="margin-top:8px"><div class="num">${rec.scores.total ?? "–"}</div><div class="meta"><span>総合スコア</span><b>${esc(rec.title)}</b><span>${esc(rec.song || "")} ${rec.bpm ? "BPM " + rec.bpm : ""}・${rec.people}人・${(+rec.duration).toFixed(1)}秒</span></div></div>
+      <div class="metrics">${metricRows(rec.scores)}</div></div>`;
+  const exportRow = `<div class="row" data-export style="margin-top:14px;justify-content:flex-end"><button class="btn sm ghost" data-csv>CSVで書き出し</button><button class="btn sm ghost" data-print>印刷 / PDFで保存</button></div>`;
   const coach = `
     <div class="sec"><h2>AIコーチのコメント</h2><p class="lead">数値をもとに、良い点・伸ばす点・次の練習メニューをまとめます。</p>
     <div class="panel"><div class="coach" data-coachtext>${rec.coach ? esc(rec.coach) : `<span class="note">${esc(ins)}</span>`}</div>
@@ -955,12 +1020,68 @@ function detailHTML(rec, standalone, id) {
         <div class="legend">${rec.dancers.map((d, i) => `<span><i style="background:${DANCER_COLORS[i % 8]}"></i>${d.label}</span>`).join("")}</div>
       </div>
     </div>`;
-  return `${head}${charts}
+  return `${head}${printhead}${exportRow}${whyHTML(rec)}${charts}
     <div class="sec"><h2>動きの強さの流れ</h2><p class="lead">全員の関節の速さの平均。縦の線は拍(太い線が8カウントの「1」)、青い点は動きを止めた「決め」の瞬間です。</p>
     <div class="chartbox"><canvas class="energy" height="200"></canvas></div>
     <div class="legend"><span><i style="background:var(--accent)"></i>動きの強さ</span><span><i style="background:var(--beat)"></i>決め(拍に乗った)</span><span><i style="background:var(--muted)"></i>決め(拍からずれた)</span></div></div>
     <div class="sec"><h2>カウント表</h2><p class="lead">1エイト(8カウント)ごとに、その拍での動きの強さを色の濃さで、拍に乗った決めを点で表示。${rec.bpm ? `テンポ ${rec.bpm} BPM、決め ${rec.hits.length}回のうち ${rec.onBeat}回が拍の上。` : ""}</p>${grid}</div>
     ${dancersT}<div data-cmpbox>${compareHTML(rec, standalone)}</div>${coach}`;
+}
+/* 各指標の根拠:計測値と換算のしかた */
+const WHY_REASONS = { no_audio: "音声が取れなかったため未計測", few_beats: "拍をはっきり取れなかったため未計測", few_hits: "決めが4回未満だったため未計測(短い範囲や止めの少ない振りで起きます)", one_person: "1人の動画のため未計測(2人以上で計測します)", unknown: "未計測" };
+function whyText(rec, key) {
+  const w = rec.why?.[key]; if (!w) return null;
+  if (w.reason) return key === "otohame" && rec.why.otohame.reason !== "few_hits" && rec.why.otohame.reason !== "few_beats" ? audioInfo(rec.audioStatus).why : (WHY_REASONS[w.reason] || WHY_REASONS.unknown);
+  return w.how;
+}
+function whyHTML(rec) {
+  const body = rec.why ? METRICS.map(m => {
+    const w = rec.why[m.key] || {}, v = rec.scores[m.key];
+    const per = w.per && rec.dancers.length > 1 ? `<div class="how">${rec.dancers.map((d, i) => `${d.label} ${w.per[i] ?? "—"}`).join(" / ")}</div>` : "";
+    return `<tr><td><b>${m.name}</b><div class="how">${m.hint}</div></td><td class="n"><b>${v ?? "—"}</b></td><td class="m">${w.measured != null ? `${w.measured} ${w.unit || ""}` : "—"}${per}</td><td class="how">${esc(whyText(rec, m.key) || "")}</td></tr>`;
+  }).join("") : `<tr><td colspan="4" class="how">この記録は旧版で保存されたため計測値が残っていません。同じ動画をもう一度解析すると表示されます。</td></tr>`;
+  return `<div class="sec why"><h2>各指標の根拠(なぜこの点数か)</h2><p class="lead">点数は「計測値」を0〜100に換算したものです。換算の基準は仮置きなので、講師の評価と照らして調整できます。総合は 音ハメ25%・メリハリ20%・大きさ15%・可動域15%・揃い15%・左右10% の重み付き平均(未計測の項目は除いて計算)。</p>
+    <div class="tablewrap panel" style="padding:6px 10px"><table class="t"><thead><tr><th>指標</th><th>点数</th><th>計測値</th><th>計算のしかた・未計測の理由</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
+}
+
+/* ---------- export: CSV / print ---------- */
+const CSV_HEAD = ["練習日", "タイトル", "ダンサー/チーム", "曲", "行", "映っていた割合", "BPM", "人数", "秒数", "総合", ...METRICS.map(m => m.name), "決め回数", "拍に乗った決め", ...METRICS.map(m => m.name + "(計測値)"), "見本", "見本との一致度", "音声", "解析日時"];
+function toCSV(list) {
+  const q = v => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const rows = [CSV_HEAD];
+  for (const r of list) {
+    const base = [r.date, r.title, r.dancer, r.song || "", "全体", "", r.bpm ?? "", r.people, (+r.duration).toFixed(1), r.scores.total, ...METRICS.map(m => r.scores[m.key]), r.hits?.length ?? "", r.onBeat ?? "",
+      ...METRICS.map(m => r.why?.[m.key]?.measured ?? ""), r.isRef ? "見本" : "", r.compare && !r.compare.error ? r.compare.similarity : "", r.bpm ? "あり" : audioInfo(r.audioStatus).why, r.createdAt ? new Date(r.createdAt).toLocaleString("ja-JP") : ""];
+    rows.push(base);
+    if (r.dancers.length > 1) r.dancers.forEach((d, i) => rows.push([r.date, r.title, r.dancer, r.song || "", d.label, Math.round(d.presence * 100) + "%", "", "", "", "", d.size, d.merihari, "", d.range, d.balance, d.sync, "", "",
+      ...METRICS.map(m => r.why?.[m.key]?.per?.[i] ?? ""), "", "", "", ""]));
+  }
+  return "\ufeff" + rows.map(r => r.map(q).join(",")).join("\r\n") + "\r\n";
+}
+function csvName(list) { return `oppiy-scope_${list[0].date}_${list[0].title}.csv`.replace(/[\\/:*?"<>|]/g, "_"); }
+function downloadText(name, text, mime = "text/csv;charset=utf-8") {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+$("#exportCsv").addEventListener("click", () => {
+  const f = $("#hFilter").value, list = records.filter(r => !f || r.dancer === f);
+  if (!list.length) { showBanner("書き出す記録がありません。"); return; }
+  downloadText(`oppiy-scope_記録_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.csv`, toCSV(list));
+});
+/* 印刷:白背景に切り替えてグラフを描き直してから印刷(ブラウザの印刷画面で「PDFに保存」を選べる) */
+let printing = false;
+async function printRecord(host, rec) {
+  if (printing) return; printing = true;
+  const opts = host._renderOpts;
+  document.documentElement.classList.add("print"); document.body.classList.add("printing"); host.classList.add("print-target");
+  renderResult(rec, opts);
+  await new Promise(r => setTimeout(r, 120));
+  let finished = false;
+  const done = () => { if (finished) return; finished = true; printing = false; window.removeEventListener("afterprint", done);
+    document.documentElement.classList.remove("print"); document.body.classList.remove("printing"); host.classList.remove("print-target"); renderResult(rec, opts); };
+  window.addEventListener("afterprint", done);
+  window.print();
+  setTimeout(done, 1000);
 }
 function previousOf(rec) {
   const ts = rec.createdAt || Date.now();
