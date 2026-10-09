@@ -23,18 +23,21 @@ YOLO-Pose(YOLOv8n-pose)でダンス動画をブラウザ内で解析し、
 5. 関節の速さ・角度・止めの瞬間から6指標を計算 → 総合スコア(重み付き平均)
 6. 見本と比較する場合: 8関節の角度の時系列(約4コマ/秒)を、部分一致のDTW(動的時間伸縮)で見本に合わせ、振りの一致度・タイミング・部位別ズレ・2秒ごとの一致度を算出。左右反転の見本も自動判定
 
-## 移設時に差し替えが必要な箇所
+## 裏側(Supabase)
 
-claude.ai のアーティファクト専用の機能を使っている部分があります。外で動かすと自動で「開いている間だけ保存」に切り替わりますが、本番では次を差し替えてください。
+- プロジェクト: `oppiy-scope`(東京 `ap-northeast-1`)
+- テーブル: `analyses`(`id` uuid / `user_id` / `created_at` / `data` jsonb に記録を丸ごと)。定義は `supabase/migrations/`
+- RLS: ログイン済みユーザーのみ読み書き可。匿名は不可。スタジオ内共有ツールの前提で、ログイン済み同士は互いの記録を見られる
+- ログイン: Supabase Auth のメール+パスワード。**セルフ登録は無効**にし、ユーザーは管理画面(Authentication → Users → Add user)で追加する
+- `index.html` 先頭の `SUPABASE_URL` / `SUPABASE_KEY` は公開してよい publishable key。Service Role Key は絶対に置かない
 
-| 箇所 | 今 | 差し替え先の例 |
+`index.html` 側は `db.collection("analyses").doc(id).set / update / delete` の形を `makeDb()` で保っているので、保存系の呼び出し元(`saveBtn`、`confirmDelete`、`clearSamples`、`wireCompare`、`data-refmark`)は触っていない。
+
+## まだ差し替えが必要な箇所
+
+| 箇所 | 今 | 差し替え先 |
 |---|---|---|
-| 記録の保存・読込(`db.collection("analyses")`) | アーティファクトの共有DB | Supabase のテーブル `analyses`(1レコード = 1解析、中身は JSON) |
-| ログイン・権限(`claude.use("user")`) | claude.ai のアカウント | Supabase Auth |
-| ログイン画面(`#gateForm` の submit) | 試作のためパスワード確認なしで入場 | `supabase.auth.signInWithPassword` に接続し、失敗時は `#gateNote` にエラー表示 |
-| AIコーチ(`claude.use("sample")`) | claude.ai 経由で Claude を呼ぶ | サーバー側(Cloudflare Workers 等)から Claude API を呼ぶ。APIキーはブラウザに置かない |
-
-`boot: db` ブロック、`saveBtn` のクリック処理、`confirmDelete`、`clearSamples`、`runCoach`、`wireCompare`(比較結果の保存)、`data-refmark`(見本の登録・解除)の7か所が対象です。
+| AIコーチ(`runCoach` の `window.claude.use("sample")`) | claude.ai 専用。外では「この画面ではAIコーチを使えません」と出る | Cloudflare Workers から Claude API を呼ぶ。APIキーはブラウザに置かない |
 
 ## 保存しているデータ(analyses の1件)
 
@@ -49,6 +52,7 @@ angles{fps, t0, n, dancers[][], mean[], energy[]}(比較用の関節角度), isR
 
 - ONNX Runtime Web: `https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.wasm.min.js`
   (同梱の wasm を `wasmBinary` で渡し、glue の .mjs のみ CDN から読む。シングルスレッド)
+- supabase-js: `https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js`
 - フォント: Google Fonts(Unbounded / Dela Gothic One / Zen Kaku Gothic New / IBM Plex Mono)
 
 ## ライセンス上の注意

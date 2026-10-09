@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OPPIY SCOPE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
@@ -194,6 +199,8 @@ table.t td.n{font-family:var(--f-mono);text-align:right}
 .kicker{font-family:var(--f-mono);font-size:11px;letter-spacing:.16em;color:var(--muted);font-weight:600;text-transform:uppercase}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
+</head>
+<body>
 
 <div class="gate" id="gate" role="dialog" aria-label="ログイン">
   <canvas id="gateDancer" aria-hidden="true"></canvas>
@@ -206,7 +213,7 @@ table.t td.n{font-family:var(--f-mono);text-align:right}
       <label class="f"><span class="lab">メールアドレス</span><input id="gEmail" type="email" placeholder="you@studio.jp" autocomplete="email"></label>
       <label class="f"><span class="lab">パスワード</span><input id="gPass" type="password" placeholder="••••••••" autocomplete="current-password"></label>
       <button class="btn stagein" type="submit">STAGE IN</button>
-      <p class="gate-note" id="gateNote">試作版のため、ここではパスワードを確認せずに入ります(記録はclaude.aiのアカウントで保存)。本番ではSupabase Authにつなぎます。</p>
+      <p class="gate-note" id="gateNote">登録済みのメールアドレスとパスワードで入ります。</p>
     </form>
   </div>
 </div>
@@ -328,9 +335,15 @@ table.t td.n{font-family:var(--f-mono);text-align:right}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.wasm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
 <script>
 (() => {
 "use strict";
+/* ---------- Supabase(裏側:DB / ログイン)----------
+   publishable key はブラウザに置いてよい公開キー。Service Role Key は絶対にここに書かない。 */
+const SUPABASE_URL = "https://xnjcanoibshixxcjejii.supabase.co";
+const SUPABASE_KEY = "sb_publishable_A1rVNffy4RtpYCPCKD4PDA_Dc3vCRos";
+const sb = window.supabase?.createClient ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
@@ -430,10 +443,20 @@ function gateLoop(t) { drawDancer(t); if (!reduceMotion) gateRAF = requestAnimat
 function openGate() { gate.classList.remove("out"); sizeGate(); cancelAnimationFrame(gateRAF); gateRAF = requestAnimationFrame(gateLoop); }
 function closeGate() { gate.classList.add("out"); setTimeout(() => cancelAnimationFrame(gateRAF), 650); }
 window.addEventListener("resize", () => { if (!gate.classList.contains("out")) sizeGate(); });
-let entered = false; try { entered = sessionStorage.getItem("oppiy-in") === "1"; } catch {}
-if (entered) gate.classList.add("out"); else openGate();
-$("#gateForm").addEventListener("submit", e => { e.preventDefault(); try { sessionStorage.setItem("oppiy-in", "1"); } catch {} closeGate(); });
-$("#logoutBtn").addEventListener("click", () => { try { sessionStorage.removeItem("oppiy-in"); } catch {} openGate(); });
+openGate();
+const gateNote = $("#gateNote"), gateNoteDefault = gateNote.textContent;
+$("#gateForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  if (!sb) { gateNote.textContent = "ログイン機能を読み込めませんでした。通信環境を確認してページを開き直してください。"; return; }
+  const btn = e.currentTarget.querySelector("button[type=submit]");
+  btn.disabled = true; gateNote.textContent = "確認中…";
+  const { error } = await sb.auth.signInWithPassword({ email: $("#gEmail").value.trim(), password: $("#gPass").value });
+  btn.disabled = false;
+  if (error) { gateNote.textContent = /invalid/i.test(error.message) ? "メールアドレスまたはパスワードが違います。" : "ログインできませんでした:" + error.message; return; }
+  gateNote.textContent = gateNoteDefault; $("#gPass").value = "";
+  closeGate(); await loadRecords();
+});
+$("#logoutBtn").addEventListener("click", async () => { if (sb) await sb.auth.signOut().catch(() => {}); records = []; renderAll(); openGate(); });
 
 /* ---------- tabs ---------- */
 function showView(name) {
@@ -1372,19 +1395,45 @@ function renderTrend() {
       return `<tr><td>${m.name}</td><td class="n">${a ?? "—"}</td><td class="n">${b ?? "—"}</td><td class="n" style="color:${diff == null ? "var(--muted)" : diff > 0 ? "var(--good)" : diff < 0 ? "var(--bad)" : "var(--muted)"}">${diff == null ? "—" : (diff > 0 ? "+" : "") + diff}</td></tr>`; }).join("") + "</tbody>";
 }
 
-/* ---------- boot: db ---------- */
+/* ---------- boot: db(Supabase)----------
+   analyses テーブル: id(uuid) / user_id / created_at / data(jsonb に記録を丸ごと)。
+   保存系の呼び出し元を変えずに済むよう、db.collection("analyses").doc(id).set/update/delete の形を保つ。 */
+function showBanner(msg) { $("#dbBanner").textContent = msg; $("#dbBanner").classList.remove("hidden"); }
+function hideBanner() { $("#dbBanner").classList.add("hidden"); }
+function makeDb(client) {
+  const table = () => client.from("analyses");
+  const doc = id => ({
+    id,
+    async set(data) { const { error } = await table().insert({ id, data }); if (error) throw error; records.unshift({ ...data, id }); renderAll(); },
+    async update(patch) {
+      const cur = records.find(r => r.id === id) || {};
+      const merged = { ...cur, ...patch }; delete merged.id;
+      const { error } = await table().update({ data: merged }).eq("id", id); if (error) throw error;
+      Object.assign(cur, patch); renderAll();
+    },
+    async delete() { const { error } = await table().delete().eq("id", id); if (error) throw error; records = records.filter(r => r.id !== id); renderAll(); },
+  });
+  return { collection: name => { if (name !== "analyses") throw new Error("unknown collection " + name); return { doc: id => doc(id || crypto.randomUUID()) }; } };
+}
+async function loadRecords() {
+  if (!sb) return;
+  const { data, error } = await sb.from("analyses").select("id, data").order("created_at", { ascending: false }).limit(500);
+  dbReady = true;
+  if (error) { showBanner("記録を読み込めませんでした。ページを開き直してください。"); renderAll(); return; }
+  hideBanner();
+  records = data.map(r => ({ ...r.data, id: r.id }));
+  renderAll();
+}
 (async () => {
   renderHistory();
-  const cl = window.claude;
-  if (!cl?.use) { dbReady = true; $("#dbBanner").textContent = "この画面では記録を長期保存できません。解析結果は開いている間だけ残ります。"; $("#dbBanner").classList.remove("hidden"); renderAll(); return; }
-  [db, user] = await Promise.all([cl.use("db").catch(() => null), cl.use("user").catch(() => null)]);
-  if (user) { try { const w = await user.can("data.write"); if (w === false) canWrite = false; } catch {} }
-  if (!db) { dbReady = true; $("#dbBanner").textContent = "サインインしていないため、記録は開いている間だけ残ります。"; $("#dbBanner").classList.remove("hidden"); renderAll(); return; }
-  db.collection("analyses").orderBy("createdAt", "desc").limit(500).onSnapshot(snap => {
-    dbReady = true;
-    records = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-    renderAll();
-  }, err => { dbReady = true; $("#dbBanner").textContent = "記録を読み込めませんでした。ページを開き直してください。"; $("#dbBanner").classList.remove("hidden"); renderAll(); });
+  if (!sb) { dbReady = true; showBanner("この画面では記録を長期保存できません。解析結果は開いている間だけ残ります。"); renderAll(); return; }
+  db = makeDb(sb);
+  const { data: { session: auth } } = await sb.auth.getSession().catch(() => ({ data: { session: null } }));
+  user = auth?.user || null;
+  if (user) { closeGate(); await loadRecords(); } else { dbReady = true; renderAll(); }
+  sb.auth.onAuthStateChange((_ev, s) => { user = s?.user || null; });
 })();
 })();
 </script>
+</body>
+</html>
