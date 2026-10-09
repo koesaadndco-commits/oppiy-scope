@@ -1,6 +1,7 @@
-/* AIコーチ(Cloudflare Pages Functions)
+/* Cloudflare Worker:静的ファイル(public/)の配信 + AIコーチ API
    ブラウザ → POST /api/coach → ここで Claude API を呼ぶ。APIキーはブラウザに出さない。
-   Secrets(Cloudflare Pages → Settings → Variables and Secrets):
+   それ以外のパスは public/ の静的ファイルをそのまま返す(wrangler.jsonc の assets)。
+   Secrets(Cloudflare → Workers & Pages → oppiy-scope → Settings → Variables and Secrets):
      ANTHROPIC_API_KEY  … 必須
    任意の環境変数:
      COACH_MODEL        … 既定 claude-opus-5-5
@@ -24,7 +25,7 @@ async function verifyUser(req) {
   return u?.id ? u : null;
 }
 
-export async function onRequestPost({ request, env }) {
+async function coach(request, env) {
   if (!env.ANTHROPIC_API_KEY) return json({ error: "not_configured", message: "AIコーチの設定が未完了です(ANTHROPIC_API_KEY 未登録)。" }, 503);
 
   const user = await verifyUser(request);
@@ -66,3 +67,14 @@ export async function onRequestPost({ request, env }) {
   if (!text) return json({ error: "empty", message: "コメントを作れませんでした。" }, 502);
   return json({ text, model: msg.model });
 }
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (url.pathname === "/api/coach") {
+      if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+      return coach(request, env);
+    }
+    return env.ASSETS.fetch(request);
+  },
+};

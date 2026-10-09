@@ -7,13 +7,14 @@ YOLO-Pose(YOLOv8n-pose)でダンス動画をブラウザ内で解析し、
 
 | ファイル | 役割 |
 |---|---|
-| `index.html` | アプリ本体(HTML/CSS/JS 1枚) |
-| `yolov8n-pose.onnx` | 姿勢推定モデル(Ultralytics YOLOv8n-pose を ONNX 変換、入力 640×640、出力 [1,56,8400]) |
-| `ort-wasm-simd-threaded.wasm` | ONNX Runtime Web 1.20.1 の実行エンジン |
-| `functions/api/coach.js` | AIコーチ(Pages Functions。Claude API の中継) |
+| `public/index.html` | アプリ本体(HTML/CSS/JS 1枚) |
+| `public/yolov8n-pose.onnx` | 姿勢推定モデル(Ultralytics YOLOv8n-pose を ONNX 変換、入力 640×640、出力 [1,56,8400]) |
+| `public/ort-wasm-simd-threaded.wasm` | ONNX Runtime Web 1.20.1 の実行エンジン |
+| `src/worker.js` | Worker 本体:`public/` の配信 + AIコーチ API(Claude API の中継) |
+| `wrangler.jsonc` | Cloudflare Workers の設定 |
 | `supabase/migrations/` | DB マイグレーション |
 
-Cloudflare Pages が `main` を自動デプロイします(ビルドなし、ルート配信)。
+Cloudflare Workers(Workers Builds)が GitHub への push を検知して自動デプロイします。
 `file://` で直接開くと fetch が失敗するので、ローカル確認は `npx serve .` などで。
 
 ## 動作の流れ
@@ -31,15 +32,15 @@ Cloudflare Pages が `main` を自動デプロイします(ビルドなし、ル
 - テーブル: `analyses`(`id` uuid / `user_id` / `created_at` / `data` jsonb に記録を丸ごと)。定義は `supabase/migrations/`
 - RLS: ログイン済みユーザーのみ読み書き可。匿名は不可。スタジオ内共有ツールの前提で、ログイン済み同士は互いの記録を見られる
 - ログイン: Supabase Auth のメール+パスワード。**セルフ登録は無効**にし、ユーザーは管理画面(Authentication → Users → Add user)で追加する
-- `index.html` 先頭の `SUPABASE_URL` / `SUPABASE_KEY` は公開してよい publishable key。Service Role Key は絶対に置かない
+- `public/index.html` 先頭の `SUPABASE_URL` / `SUPABASE_KEY` は公開してよい publishable key。Service Role Key は絶対に置かない
 
-`index.html` 側は `db.collection("analyses").doc(id).set / update / delete` の形を `makeDb()` で保っているので、保存系の呼び出し元(`saveBtn`、`confirmDelete`、`clearSamples`、`wireCompare`、`data-refmark`)は触っていない。
+`public/index.html` 側は `db.collection("analyses").doc(id).set / update / delete` の形を `makeDb()` で保っているので、保存系の呼び出し元(`saveBtn`、`confirmDelete`、`clearSamples`、`wireCompare`、`data-refmark`)は触っていない。
 
-## AIコーチ(Cloudflare Pages Functions)
+## AIコーチ(Cloudflare Workers)
 
-- `functions/api/coach.js` が `POST /api/coach` を受け、サーバー側で Claude API(`claude-opus-5-5`)を呼ぶ。APIキーはブラウザに出ない
+- `src/worker.js` が `POST /api/coach` を受け、サーバー側で Claude API(`claude-opus-5-5`)を呼ぶ。APIキーはブラウザに出ない
 - Supabase のアクセストークンを検証し、ログイン済みユーザーだけが使える
-- 必要な Secret(Cloudflare Pages → Settings → Variables and Secrets → Add → Encrypt): `ANTHROPIC_API_KEY`
+- 必要な Secret(Cloudflare → Workers & Pages → oppiy-scope → 設定 → 変数とシークレット → 追加 → シークレット): `ANTHROPIC_API_KEY`
 - 任意: `COACH_MODEL` でモデルを変えられる
 - 未登録のときはアプリ側に「AIコーチの設定が未完了です」と出る(他の機能は動く)
 

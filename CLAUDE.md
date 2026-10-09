@@ -5,7 +5,7 @@
 ## 構成(社内標準)
 
 - **GitHub** = 司令塔:ソース・マイグレーション・変更履歴の起点
-- **Cloudflare Pages / Workers** = 表側:配信・SSL・AIコーチのAPI中継
+- **Cloudflare Workers** = 表側:`public/` の配信・SSL・AIコーチのAPI中継(`src/worker.js`、設定は `wrangler.jsonc`)
 - **Supabase** = 裏側:DB(`analyses`)・Auth
 - **Claude Code** = 開発担当
 
@@ -17,7 +17,7 @@
 ## push 前の必須チェック
 
 - `.env*`・APIキー・Service Role Key を含めていない
-- フロント(`index.html`)に書くのは Supabase の anon(publishable)key のみ
+- フロント(`public/index.html`)に書くのは Supabase の anon(publishable)key のみ
 - Claude API はブラウザから呼ばない。必ず Workers 経由
 - 全テーブルで RLS 有効、本人の記録しか読めない
 - 動画そのものは保存しない(端末内で解析のみ)
@@ -26,16 +26,17 @@
 
 | パス | 役割 |
 |---|---|
-| `index.html` | アプリ本体(HTML/CSS/JS 1枚) |
-| `yolov8n-pose.onnx` | 姿勢推定モデル(AGPL-3.0。社外公開前にライセンス確認) |
-| `ort-wasm-simd-threaded.wasm` | ONNX Runtime Web 1.20.1 |
-| `functions/api/coach.js` | AIコーチ(Pages Functions)。Secret `ANTHROPIC_API_KEY` を Cloudflare 側に登録 |
+| `public/index.html` | アプリ本体(HTML/CSS/JS 1枚) |
+| `public/yolov8n-pose.onnx` | 姿勢推定モデル(AGPL-3.0。社外公開前にライセンス確認) |
+| `public/ort-wasm-simd-threaded.wasm` | ONNX Runtime Web 1.20.1 |
+| `src/worker.js` | Worker:静的配信 + AIコーチ API。Secret `ANTHROPIC_API_KEY` を Cloudflare 側に登録 |
+| `wrangler.jsonc` | Workers 設定(assets = `public/`) |
 | `supabase/migrations/` | DBマイグレーション(本番は管理画面から直接変更しない) |
 
 ## 環境
 
 - Development: 作業ブランチ / Supabase ブランチDB
-- Preview: PR / Cloudflare プレビューURL / Supabase 検証DB
+- Preview: PR / Cloudflare プレビューURL(Workers Builds の非本番ブランチ)/ Supabase 検証DB
 - Production: `main` のみ / Supabase 本番
 
 本番データを開発・確認環境に持ち込まない。検証はダミーデータ。

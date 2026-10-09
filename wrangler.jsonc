@@ -1,0 +1,14 @@
+{
+  // Cloudflare Workers の設定。Workers Builds が GitHub への push を検知して自動デプロイする。
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "oppiy-scope",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "none"
+  },
+  "observability": { "enabled": true }
+}
