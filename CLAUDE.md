@@ -29,6 +29,7 @@
 | `index.html` | アプリ本体(HTML/CSS/JS 1枚) |
 | `yolov8n-pose.onnx` | 姿勢推定モデル(AGPL-3.0。社外公開前にライセンス確認) |
 | `ort-wasm-simd-threaded.wasm` | ONNX Runtime Web 1.20.1 |
+| `functions/api/coach.js` | AIコーチ(Pages Functions)。Secret `ANTHROPIC_API_KEY` を Cloudflare 側に登録 |
 | `supabase/migrations/` | DBマイグレーション(本番は管理画面から直接変更しない) |
 
 ## 環境

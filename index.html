@@ -1295,9 +1295,9 @@ $("#clearSamples").addEventListener("click", async e => {
 /* ---------- AI coach ---------- */
 async function runCoach(rec, id, btn) {
   const host = btn.closest(".panel"), out = host.querySelector("[data-coachtext]"), note = host.querySelector("[data-coachnote]");
-  const sample = window.claude?.use ? await window.claude.use("sample").catch(() => null) : null;
-  if (!sample) { note.textContent = "この画面ではAIコーチを使えません。上の要約を参考にしてください。"; return; }
-  btn.disabled = true; note.textContent = "考え中…";
+  const token = sb ? (await sb.auth.getSession().catch(() => null))?.data?.session?.access_token : null;
+  if (!token) { note.textContent = "AIコーチはログイン中だけ使えます。"; return; }
+  btn.disabled = true; note.textContent = "考え中…(10〜20秒)";
   const payload = { タイトル: rec.title, ダンサー: rec.dancer, 曲: rec.song, BPM: rec.bpm, 人数: rec.people, 秒数: rec.duration,
     スコア: Object.fromEntries(METRICS.map(m => [m.name, rec.scores[m.key]])), 総合: rec.scores.total,
     ダンサー別: rec.dancers, 決めの回数: rec.hits.length, 拍に乗った決め: rec.onBeat };
@@ -1309,11 +1309,13 @@ async function runCoach(rec, id, btn) {
 【次の練習メニュー】(具体的なドリルを2つ)
 データ: ${JSON.stringify(payload)}`;
   try {
-    const res = await sample(prompt, { onText: ({ text }) => { out.textContent = text; }, modelTier: "default" });
+    const r = await fetch("/api/coach", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + token }, body: JSON.stringify({ prompt }) });
+    const res = await r.json().catch(() => ({}));
+    if (!r.ok) { const e = new Error(res.message || "コメントを作れませんでした。"); e.code = res.error; throw e; }
     out.textContent = res.text; rec.coach = res.text; note.textContent = "";
     if (db && id && !id.startsWith("local-") && canWrite) { await db.collection("analyses").doc(id).update({ coach: res.text }); note.textContent = "記録に保存しました"; }
     else if (rec === current && current._id && db) { await db.collection("analyses").doc(current._id).update({ coach: res.text }); note.textContent = "記録に保存しました"; }
-  } catch (e) { note.textContent = e?.code === "rate_limited" ? "少し時間をおいてから試してください。" : "コメントを作れませんでした。"; }
+  } catch (e) { note.textContent = e?.message || "コメントを作れませんでした。"; }
   btn.disabled = false; btn.textContent = "コメントを作り直す";
 }
 

@@ -10,8 +10,10 @@ YOLO-Pose(YOLOv8n-pose)でダンス動画をブラウザ内で解析し、
 | `index.html` | アプリ本体(HTML/CSS/JS 1枚) |
 | `yolov8n-pose.onnx` | 姿勢推定モデル(Ultralytics YOLOv8n-pose を ONNX 変換、入力 640×640、出力 [1,56,8400]) |
 | `ort-wasm-simd-threaded.wasm` | ONNX Runtime Web 1.20.1 の実行エンジン |
+| `functions/api/coach.js` | AIコーチ(Pages Functions。Claude API の中継) |
+| `supabase/migrations/` | DB マイグレーション |
 
-3ファイルを同じフォルダに置いて、静的ホスティング(Cloudflare Pages など)で配信すれば動きます。
+Cloudflare Pages が `main` を自動デプロイします(ビルドなし、ルート配信)。
 `file://` で直接開くと fetch が失敗するので、ローカル確認は `npx serve .` などで。
 
 ## 動作の流れ
@@ -33,11 +35,13 @@ YOLO-Pose(YOLOv8n-pose)でダンス動画をブラウザ内で解析し、
 
 `index.html` 側は `db.collection("analyses").doc(id).set / update / delete` の形を `makeDb()` で保っているので、保存系の呼び出し元(`saveBtn`、`confirmDelete`、`clearSamples`、`wireCompare`、`data-refmark`)は触っていない。
 
-## まだ差し替えが必要な箇所
+## AIコーチ(Cloudflare Pages Functions)
 
-| 箇所 | 今 | 差し替え先 |
-|---|---|---|
-| AIコーチ(`runCoach` の `window.claude.use("sample")`) | claude.ai 専用。外では「この画面ではAIコーチを使えません」と出る | Cloudflare Workers から Claude API を呼ぶ。APIキーはブラウザに置かない |
+- `functions/api/coach.js` が `POST /api/coach` を受け、サーバー側で Claude API(`claude-opus-5-5`)を呼ぶ。APIキーはブラウザに出ない
+- Supabase のアクセストークンを検証し、ログイン済みユーザーだけが使える
+- 必要な Secret(Cloudflare Pages → Settings → Variables and Secrets → Add → Encrypt): `ANTHROPIC_API_KEY`
+- 任意: `COACH_MODEL` でモデルを変えられる
+- 未登録のときはアプリ側に「AIコーチの設定が未完了です」と出る(他の機能は動く)
 
 ## 保存しているデータ(analyses の1件)
 
