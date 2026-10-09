@@ -1,0 +1,1390 @@
+<title>OPPIY SCOPE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a night-time stage seen through a camera viewfinder — the "scope". Dark by design (stage lighting), gel-coloured
+   accents (magenta → amber) for the dancer, cyan for the beat. Login is the stage door; the app is the rehearsal monitor. */
+:root{
+  color-scheme:dark;
+  --bg:#0a0710; --bg2:#120c1b; --surface:#16101f; --surface2:#221a2e; --ink:#f4effa; --muted:#a297b2; --line:#2f2540;
+  --accent:#ff3d8b; --accent2:#ffb03a; --accent-soft:#3a1428; --beat:#38e1f0; --beat-soft:#0f2d33;
+  --good:#47d98a; --warn:#ffc04d; --bad:#ff5a5a;
+  --stage:#05030a; --stage-ink:#f4effa;
+  --gel:linear-gradient(100deg,#ff3d8b 0%,#ff6a5c 45%,#ffb03a 100%);
+  --f-display:"Unbounded","Dela Gothic One",sans-serif;
+  --f-jp:"Dela Gothic One","Zen Kaku Gothic New",sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --r:14px;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--ink)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.6;padding-inline:16px;padding-block:0 64px;
+  background:
+    radial-gradient(900px 520px at 85% -10%, rgba(255,61,139,.16), transparent 60%),
+    radial-gradient(700px 480px at -10% 10%, rgba(56,225,240,.08), transparent 60%),
+    var(--bg);
+  background-attachment:fixed;}
+.wrap{max-width:1200px;margin:0 auto}
+::selection{background:var(--accent);color:#fff}
+
+/* ---------- stage door (login) ---------- */
+.gate{position:fixed;inset:0;z-index:50;background:var(--stage);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);overflow:hidden;transition:opacity .6s ease, visibility .6s}
+.gate.out{opacity:0;visibility:hidden}
+.gate::before{content:"";position:absolute;inset:0;background:
+  radial-gradient(40% 70% at 72% 0%, rgba(255,61,139,.35), transparent 70%),
+  radial-gradient(30% 50% at 60% 100%, rgba(255,176,58,.18), transparent 70%),
+  radial-gradient(35% 60% at 95% 40%, rgba(56,225,240,.14), transparent 70%);pointer-events:none}
+.gate canvas{position:absolute;right:0;top:0;width:60%;height:100%}
+.gate-copy{position:relative;z-index:2;display:flex;flex-direction:column;justify-content:center;gap:28px;padding:48px clamp(20px,6vw,80px);padding-top:max(48px,env(safe-area-inset-top,0px));min-width:0}
+.rec{display:inline-flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:12px;letter-spacing:.2em;color:var(--muted)}
+.rec::before{content:"";width:9px;height:9px;border-radius:50%;background:#ff2e4d;box-shadow:0 0 10px #ff2e4d;animation:blink 1s steps(2,start) infinite}
+@keyframes blink{to{visibility:hidden}}
+.wordmark{font-family:var(--f-display);font-weight:900;font-size:clamp(52px,8.5vw,120px);line-height:.86;letter-spacing:-.03em;margin:0;text-transform:uppercase}
+.wordmark span{display:block;background:var(--gel);-webkit-background-clip:text;background-clip:text;color:transparent}
+.tagline{font-family:var(--f-jp);font-size:clamp(18px,2.2vw,24px);margin:0;letter-spacing:.04em}
+.tagline small{display:block;font-family:var(--f-body);font-size:13px;color:var(--muted);letter-spacing:.02em;margin-top:6px;max-width:36ch}
+.counts{display:flex;gap:8px}
+.counts i{font-style:normal;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-mono);font-size:12px;color:var(--muted);border:1px solid var(--line);transition:background .08s, color .08s, box-shadow .08s}
+.counts i.on{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 0 16px var(--accent)}
+.counts i.on.one{background:var(--accent2);border-color:var(--accent2);box-shadow:0 0 18px var(--accent2);color:#1a0d00}
+.gate-card{display:flex;flex-direction:column;gap:12px;max-width:380px;padding:22px;border-radius:var(--r);background:rgba(22,16,31,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.08)}
+.gate-card .lab{font-size:12px;color:var(--muted);font-weight:700;letter-spacing:.08em}
+.gate-card input{background:rgba(0,0,0,.35)}
+.btn.stagein{font-family:var(--f-display);font-weight:700;letter-spacing:.12em;font-size:15px;padding:14px;background:var(--gel);border:0;color:#14060c;box-shadow:0 10px 30px -10px rgba(255,61,139,.7)}
+.btn.stagein:hover{filter:brightness(1.08)}
+.gate-note{font-size:11px;color:var(--muted);margin:0;line-height:1.5}
+@media (max-width:820px){
+  .gate{grid-template-columns:1fr;overflow-y:auto}
+  .gate canvas{width:100%;opacity:.45}
+  .gate-copy{justify-content:flex-end;padding-bottom:max(32px,env(safe-area-inset-bottom,0px))}
+}
+
+/* ---------- top bar ---------- */
+header.top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-block:16px 14px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:linear-gradient(var(--bg) 70%, transparent)}
+.brand{display:flex;align-items:center;gap:14px;min-width:0}
+.brand h1{font-family:var(--f-display);font-weight:900;font-size:22px;letter-spacing:-.02em;margin:0;line-height:1}
+.brand h1 b{font-weight:900;background:var(--gel);-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand .rec{font-size:10px}
+.topright{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+nav.tabs{display:flex;gap:2px;background:var(--surface);padding:4px;border-radius:999px;border:1px solid var(--line)}
+nav.tabs button{border:0;background:transparent;color:var(--muted);font:inherit;font-weight:700;font-size:13px;padding:8px 18px;border-radius:999px;cursor:pointer;letter-spacing:.04em}
+nav.tabs button[aria-selected="true"]{background:var(--gel);color:#14060c}
+nav.tabs button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible,.drop:focus-visible{outline:2px solid var(--beat);outline-offset:2px}
+.logout{background:none;border:0;color:var(--muted);font:inherit;font-size:12px;cursor:pointer;padding:6px}
+.logout:hover{color:var(--ink)}
+section.view{padding-top:18px}
+.grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:22px;align-items:start}
+@media (max-width:880px){.grid{grid-template-columns:1fr}}
+
+/* ---------- the scope (video monitor) ---------- */
+.stage{background:var(--stage);color:var(--stage-ink);border-radius:var(--r);overflow:hidden;position:relative;border:1px solid var(--line)}
+.stage::after{content:"";position:absolute;inset:12px;pointer-events:none;
+  background:
+   linear-gradient(var(--beat),var(--beat)) top left/22px 2px, linear-gradient(var(--beat),var(--beat)) top left/2px 22px,
+   linear-gradient(var(--beat),var(--beat)) top right/22px 2px, linear-gradient(var(--beat),var(--beat)) top right/2px 22px,
+   linear-gradient(var(--beat),var(--beat)) bottom left/22px 2px, linear-gradient(var(--beat),var(--beat)) bottom left/2px 22px,
+   linear-gradient(var(--beat),var(--beat)) bottom right/22px 2px, linear-gradient(var(--beat),var(--beat)) bottom right/2px 22px;
+  background-repeat:no-repeat;opacity:.7}
+.stage canvas{display:block;width:100%;height:auto;max-width:100%}
+.drop{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:16px;padding:52px 22px;min-height:380px;cursor:pointer;
+  background:radial-gradient(60% 70% at 50% 0%, rgba(255,61,139,.22), transparent 70%), radial-gradient(50% 40% at 50% 100%, rgba(56,225,240,.10), transparent 70%)}
+.drop::before{content:"";position:absolute;width:120px;height:120px;border:1px dashed rgba(244,239,250,.25);border-radius:50%;top:50%;left:50%;transform:translate(-50%,-90%)}
+.drop.over{background:radial-gradient(60% 70% at 50% 0%, rgba(255,61,139,.4), transparent 70%)}
+.drop h2{font-family:var(--f-jp);font-weight:400;font-size:clamp(22px,3vw,30px);margin:0;line-height:1.3;text-wrap:balance}
+.drop p{margin:0;color:rgba(244,239,250,.7);font-size:13px;max-width:44ch}
+.countrow{display:flex;gap:6px;font-family:var(--f-mono);font-size:12px;color:rgba(244,239,250,.55);position:relative}
+.countrow i{font-style:normal;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(244,239,250,.2)}
+.countrow i:first-child{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 0 12px var(--accent)}
+.stagebar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-top:1px solid rgba(244,239,250,.08);font-family:var(--f-mono);font-size:12px;background:rgba(255,255,255,.02)}
+.stagebar .grow{flex:1;min-width:120px}
+.prog{height:4px;background:rgba(244,239,250,.1);border-radius:4px;overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:var(--gel);transition:width .2s;box-shadow:0 0 10px var(--accent)}
+
+/* ---------- panels & forms ---------- */
+.panel{background:linear-gradient(180deg,rgba(255,255,255,.025),transparent 40%),var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px}
+.panel h3{margin:0 0 14px;font-family:var(--f-display);font-weight:700;font-size:11px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+.form .full{grid-column:1/-1}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:500;min-width:0}
+input,select,textarea{font:inherit;font-size:14px;color:var(--ink);background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;min-width:0;transition:border-color .15s}
+input:hover,select:hover{border-color:#43375a}
+.btn{font:inherit;font-weight:700;font-size:14px;border-radius:999px;padding:10px 18px;border:1px solid var(--line);background:var(--surface2);color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:8px;justify-content:center;transition:transform .1s, filter .15s}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--gel);border:0;color:#14060c;box-shadow:0 8px 24px -10px rgba(255,61,139,.8)}
+.btn.ghost{background:transparent}
+.btn.sm{padding:6px 12px;font-size:12px}
+.btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.note{font-size:12px;color:var(--muted)}
+.stack{display:flex;flex-direction:column;gap:18px;min-width:0}
+
+/* ---------- score sheet ---------- */
+.total{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap}
+.total .num{font-family:var(--f-display);font-weight:900;font-size:84px;line-height:.82;letter-spacing:-.04em;background:var(--gel);-webkit-background-clip:text;background-clip:text;color:transparent;font-variant-numeric:tabular-nums}
+.total .meta{display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--muted);padding-bottom:4px;min-width:0}
+.total .meta b{color:var(--ink);font-size:16px}
+.metrics{display:flex;flex-direction:column;gap:13px;margin-top:18px}
+.metric{display:grid;grid-template-columns:7.5em minmax(0,1fr) 3em;gap:12px;align-items:center}
+.metric .k{font-weight:700;font-size:14px}
+.metric .k small{display:block;font-weight:400;font-size:11px;color:var(--muted);line-height:1.3}
+.bar{height:8px;background:var(--surface2);border-radius:8px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:8px;box-shadow:0 0 10px currentColor}
+.metric .v{font-family:var(--f-display);font-weight:700;font-variant-numeric:tabular-nums;text-align:right;font-size:16px}
+.metric.na .v{color:var(--muted);font-weight:500}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:11px;font-weight:700;letter-spacing:.06em;padding:4px 10px;border-radius:999px;background:var(--surface2);color:var(--muted)}
+.chip.acc{background:var(--accent-soft);color:var(--accent)}
+.chip.beat,.chip.ref{background:var(--beat-soft);color:var(--beat)}
+.sec{margin-top:30px}
+.sec h2{font-family:var(--f-jp);font-weight:400;font-size:21px;margin:0 0 4px;letter-spacing:.02em}
+.sec .lead{color:var(--muted);font-size:13px;margin:0 0 12px;max-width:72ch}
+.chartbox{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.chartbox canvas{display:block}
+.eights{display:flex;flex-direction:column;gap:5px;font-family:var(--f-mono);font-size:11px}
+.eight{display:grid;grid-template-columns:3.4em repeat(8,minmax(0,1fr));gap:5px;align-items:center}
+.eight .lab{color:var(--muted);font-variant-numeric:tabular-nums}
+.cell{height:28px;border-radius:6px;position:relative;display:grid;place-items:center}
+.cell.hit::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--beat);box-shadow:0 0 8px var(--beat)}
+.eighthead{display:grid;grid-template-columns:3.4em repeat(8,minmax(0,1fr));gap:5px;font-family:var(--f-mono);font-size:11px;color:var(--muted);text-align:center}
+.eighthead span:nth-child(2){color:var(--accent2);font-weight:600}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:10px;align-items:center}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+table.t{width:100%;border-collapse:collapse;font-size:13px}
+table.t th{text-align:left;font-weight:700;font-size:11px;letter-spacing:.08em;color:var(--muted);padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.t td{padding:9px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+table.t tr:last-child td{border-bottom:0}
+table.t td.n{font-family:var(--f-mono);text-align:right}
+.tablewrap{overflow-x:auto}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px;box-shadow:0 0 8px currentColor}
+.refcheck{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;flex-basis:100%}
+.refcheck input{width:18px;height:18px;accent-color:var(--beat)}
+.cmp-head{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap}
+.cmp-head .num{font-family:var(--f-display);font-weight:900;font-size:72px;line-height:.82;letter-spacing:-.04em;color:var(--beat);text-shadow:0 0 24px rgba(56,225,240,.45)}
+.cmp-head .meta{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);padding-bottom:4px;min-width:0}
+.cmp-head .meta b{color:var(--ink);font-size:15px}
+.strip{display:flex;gap:2px;height:30px;border-radius:8px;overflow:hidden}
+.strip i{flex:1;min-width:2px}
+.striplab{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:11px;color:var(--muted);margin-top:4px}
+.worst{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.worst div{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
+.worst .tm{font-family:var(--f-mono);font-weight:600;min-width:9em;color:var(--accent2)}
+.charts2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:18px}
+.charts2 .panel{min-width:0}
+.radarbox{display:flex;justify-content:center}
+.radarbox canvas{max-width:100%}
+.coach{white-space:pre-wrap;font-size:14px;line-height:1.85}
+
+/* ---------- history ---------- */
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:16px}
+.toolbar label.f{min-width:160px}
+.toolbar .grow{flex:1}
+.list{display:flex;flex-direction:column;gap:10px}
+.rec-row{display:grid;grid-template-columns:120px minmax(0,1fr) auto;gap:16px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px;cursor:pointer;text-align:left;font:inherit;color:inherit;width:100%;transition:border-color .15s, transform .15s}
+.rec-row:hover{border-color:var(--accent);transform:translateY(-1px)}
+.rec-row .thumb{width:120px;aspect-ratio:16/10;max-width:100%;border-radius:8px;background:var(--stage);object-fit:cover;display:block}
+.rec-row .ttl{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rec-row .sub{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rec-row .sc{font-family:var(--f-display);font-weight:900;font-size:34px;line-height:1;text-align:right;padding-right:6px;background:var(--gel);-webkit-background-clip:text;background-clip:text;color:transparent}
+.rec-row .sc small{display:block;font-family:var(--f-body);font-size:10px;color:var(--muted);-webkit-text-fill-color:var(--muted);letter-spacing:.1em;font-weight:700}
+@media (max-width:520px){.rec-row{grid-template-columns:76px minmax(0,1fr) auto;gap:10px}.rec-row .thumb{width:76px}}
+.empty{border:1px dashed var(--line);border-radius:var(--r);padding:32px;text-align:center;color:var(--muted)}
+.banner{background:var(--accent-soft);color:var(--ink);border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:14px}
+.hidden{display:none!important}
+.kicker{font-family:var(--f-mono);font-size:11px;letter-spacing:.16em;color:var(--muted);font-weight:600;text-transform:uppercase}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="gate" id="gate" role="dialog" aria-label="ログイン">
+  <canvas id="gateDancer" aria-hidden="true"></canvas>
+  <div class="gate-copy">
+    <span class="rec">REC · YOLO-POSE</span>
+    <h1 class="wordmark">OPPIY<span>SCOPE</span></h1>
+    <p class="tagline">踊りを、データで磨く。<small>関節17点の動きから、メリハリ・音ハメ・揃い・見本との一致を数値にして記録します。</small></p>
+    <div class="counts" id="gateCounts" aria-hidden="true"><i>1</i><i>2</i><i>3</i><i>4</i><i>5</i><i>6</i><i>7</i><i>8</i></div>
+    <form class="gate-card" id="gateForm" autocomplete="on">
+      <label class="f"><span class="lab">メールアドレス</span><input id="gEmail" type="email" placeholder="you@studio.jp" autocomplete="email"></label>
+      <label class="f"><span class="lab">パスワード</span><input id="gPass" type="password" placeholder="••••••••" autocomplete="current-password"></label>
+      <button class="btn stagein" type="submit">STAGE IN</button>
+      <p class="gate-note" id="gateNote">試作版のため、ここではパスワードを確認せずに入ります(記録はclaude.aiのアカウントで保存)。本番ではSupabase Authにつなぎます。</p>
+    </form>
+  </div>
+</div>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><h1>OPPIY<b>SCOPE</b></h1><span class="rec">REC</span></div>
+    <div class="topright">
+      <nav class="tabs" role="tablist">
+        <button role="tab" id="tab-analyze" aria-selected="true" data-view="analyze">解析</button>
+        <button role="tab" id="tab-history" aria-selected="false" data-view="history">記録</button>
+        <button role="tab" id="tab-trend" aria-selected="false" data-view="trend">推移</button>
+      </nav>
+      <button class="logout" id="logoutBtn">ログアウト</button>
+    </div>
+  </header>
+
+  <!-- ANALYZE -->
+  <section class="view" id="view-analyze">
+    <div class="grid">
+      <div class="stack">
+        <div class="stage" id="stage">
+          <div class="drop" id="drop" tabindex="0" role="button" aria-label="ダンス動画を選ぶ">
+            <div class="countrow"><i>1</i><i>2</i><i>3</i><i>4</i><i>5</i><i>6</i><i>7</i><i>8</i></div>
+            <h2>ダンス動画をここにドロップ</h2>
+            <p>YOLO-Poseで全員の関節17点を追いかけ、動きの大きさ・メリハリ・音ハメ・揃いを数値にします。動画はこの端末の中だけで解析され、アップロードされません。</p>
+            <span class="btn primary">動画を選ぶ</span>
+          </div>
+          <canvas id="view" class="hidden" width="960" height="540"></canvas>
+          <div class="stagebar hidden" id="stagebar">
+            <button class="btn sm" id="playBtn" disabled>▶ 再生</button>
+            <div class="grow"><div class="prog"><i id="progFill"></i></div></div>
+            <span id="progText">待機中</span>
+          </div>
+        </div>
+        <input type="file" id="file" accept="video/*" class="hidden">
+        <video id="vid" class="hidden" playsinline preload="auto"></video>
+      </div>
+
+      <div class="stack">
+        <div class="panel" id="setupPanel">
+          <h3>解析の設定</h3>
+          <div class="form">
+            <label class="f full">タイトル<input id="fTitle" placeholder="例:10月発表会 通し練習 3回目"></label>
+            <label class="f">ダンサー/チーム<input id="fDancer" placeholder="例:キッズAクラス" list="dancerList"></label>
+            <label class="f">曲名<input id="fSong" placeholder="例:曲名"></label>
+            <label class="f">練習日<input id="fDate" type="date"></label>
+            <label class="f">解析の細かさ
+              <select id="fFps"><option value="5">速い(5コマ/秒)</option><option value="8" selected>標準(8コマ/秒)</option><option value="12">精密(12コマ/秒)</option></select>
+            </label>
+            <label class="f full">見本と比較
+              <select id="fRef"><option value="">比較しない</option></select>
+            </label>
+            <label class="f">開始(秒)<input id="fStart" type="number" min="0" step="0.5" value="0"></label>
+            <label class="f">終了(秒)<input id="fEnd" type="number" min="1" step="0.5" value="60"></label>
+          </div>
+          <datalist id="dancerList"></datalist>
+          <div class="row" style="margin-top:14px">
+            <button class="btn primary" id="runBtn" disabled>解析をはじめる</button>
+            <button class="btn ghost hidden" id="stopBtn">中止</button>
+          </div>
+          <p class="note" id="setupNote" style="margin:10px 0 0">動画を選ぶと解析できます。初回はAIモデル(約25MB)の読み込みに少し時間がかかります。</p>
+        </div>
+
+        <div class="panel hidden" id="scorePanel">
+          <div class="row" style="justify-content:space-between;margin-bottom:8px">
+            <span class="kicker" id="scoreKicker">解析結果</span>
+            <div class="chips" id="scoreChips"></div>
+          </div>
+          <div class="total"><div class="num" id="totalNum">–</div><div class="meta"><span>総合スコア</span><b id="totalTitle"></b><span id="totalSub"></span></div></div>
+          <div class="metrics" id="metrics"></div>
+          <div class="row" style="margin-top:16px" id="saveRow">
+            <label class="refcheck"><input type="checkbox" id="fIsRef"> 見本として登録する</label>
+            <button class="btn primary" id="saveBtn">記録に保存</button>
+            <span class="note" id="saveNote"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="resultDetail" class="hidden"></div>
+  </section>
+
+  <!-- HISTORY -->
+  <section class="view hidden" id="view-history">
+    <div id="dbBanner" class="banner hidden"></div>
+    <div class="toolbar">
+      <label class="f">ダンサー/チームで絞り込み<select id="hFilter"><option value="">すべて</option></select></label>
+      <label class="f">並び順<select id="hSort"><option value="date">新しい順</option><option value="score">スコア順</option></select></label>
+      <span class="grow"></span>
+      <button class="btn sm ghost hidden" id="clearSamples">サンプルを消す</button>
+    </div>
+    <div class="list" id="hList"></div>
+    <div id="historyDetail" class="hidden" style="margin-top:22px"></div>
+  </section>
+
+  <!-- TREND -->
+  <section class="view hidden" id="view-trend">
+    <div class="toolbar">
+      <label class="f">ダンサー/チーム<select id="tDancer"></select></label>
+      <label class="f">指標<select id="tMetric"></select></label>
+    </div>
+    <div class="chartbox"><canvas id="trendCanvas" height="300"></canvas></div>
+    <div class="sec charts2">
+      <div class="panel"><h3>初回と最新のバランス(レーダー)</h3>
+        <div class="radarbox"><canvas id="trendRadar" width="360" height="320"></canvas></div>
+        <div class="legend"><span><i style="background:var(--beat)"></i>初回</span><span><i style="background:var(--accent)"></i>最新</span></div>
+      </div>
+      <div class="panel"><h3>記録ごとの総合スコア(棒グラフ)</h3>
+        <div class="chartbox" style="border:0;padding:0"><canvas id="trendBars" height="300"></canvas></div>
+      </div>
+    </div>
+    <div class="sec">
+      <h2>指標ごとの最新と初回</h2>
+      <p class="lead">選んだダンサー/チームの、最初の記録から最新の記録までの伸び。</p>
+      <div class="tablewrap"><table class="t" id="trendTable"></table></div>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.wasm.min.js"></script>
+<script>
+(() => {
+"use strict";
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const r3 = v => Math.round(v * 1000) / 1000;
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+/* ---------- metric definitions ---------- */
+const METRICS = [
+  { key: "size", name: "動きの大きさ", hint: "関節がどれだけ速く大きく動いたか", w: .15 },
+  { key: "merihari", name: "メリハリ", hint: "速い動きと止めの差", w: .20 },
+  { key: "otohame", name: "音ハメ", hint: "止め・決めが拍に乗った割合", w: .25 },
+  { key: "range", name: "可動域", hint: "手足が届いた範囲の広さ", w: .15 },
+  { key: "balance", name: "左右バランス", hint: "左半身と右半身の動き量の差", w: .10 },
+  { key: "sync", name: "揃い", hint: "複数人の関節角度の一致度", w: .15 },
+];
+const DANCER_COLORS = ["#ff5b92", "#3fc5d6", "#f2b33d", "#8f7cff", "#5fd08a", "#ff8a4c", "#e46ad6", "#c9d64a"];
+const SKEL = [[5,6],[5,7],[7,9],[6,8],[8,10],[5,11],[6,12],[11,12],[11,13],[13,15],[12,14],[14,16],[0,1],[0,2],[1,3],[2,4]];
+const LEFT = [5,7,9,11,13,15], RIGHT = [6,8,10,12,14,16];
+
+/* ---------- state ---------- */
+let records = [];         // saved analyses (from db or memory)
+let db = null, user = null, canWrite = true, dbReady = false;
+let videoFile = null, current = null, frames = [], analyzing = false, stopFlag = false;
+let session = null;
+const vid = $("#vid"), view = $("#view"), vctx = view.getContext("2d");
+
+/* ---------- stage door: login + skeleton dancer ---------- */
+const gate = $("#gate"), gcv = $("#gateDancer"), gctx = gcv.getContext("2d");
+const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+const POSES = [
+  { x: .50, y: .55, lean: 0,  a: [155, 15],  b: [155, 15],  la: [18, 0],   lb: [18, 0] },
+  { x: .47, y: .57, lean: -6, a: [90, 0],    b: [40, -110], la: [26, -6],  lb: [8, 0] },
+  { x: .50, y: .63, lean: 4,  a: [60, 70],   b: [60, 70],   la: [36, -62], lb: [36, -62] },
+  { x: .53, y: .57, lean: 6,  a: [40, -110], b: [90, 0],    la: [8, 0],    lb: [26, -6] },
+  { x: .50, y: .55, lean: -8, a: [165, 0],   b: [25, 10],   la: [12, 0],   lb: [46, 0] },
+  { x: .50, y: .59, lean: 0,  a: [100, 95],  b: [100, 95],  la: [22, -24], lb: [22, -24] },
+  { x: .50, y: .54, lean: 8,  a: [25, 10],   b: [165, 0],   la: [62, -30], lb: [12, 0] },
+  { x: .50, y: .61, lean: 0,  a: [132, -58], b: [118, 82],  la: [32, -44], lb: [14, 0] },
+];
+const BONE = { torso: .24, sh: .075, hip: .05, ua: .13, fa: .12, th: .18, shin: .17 };
+function poseKeypoints(p) {
+  const rad = d => d * Math.PI / 180, r = rad(p.lean);
+  const up = [Math.sin(r), -Math.cos(r)], perp = [Math.cos(r), Math.sin(r)];
+  const add = (a, v, k) => [a[0] + v[0] * k, a[1] + v[1] * k];
+  const dir = (deg, side) => [side * Math.sin(rad(deg)), Math.cos(rad(deg))];
+  const hip = [p.x, p.y], neck = add(hip, up, BONE.torso);
+  const K = new Array(17);
+  const limb = (root, ang, l1, l2, side) => { const m = add(root, dir(ang[0], side), l1); return [m, add(m, dir(ang[0] + ang[1], side), l2)]; };
+  // viewer-left = person's right (even COCO ids), viewer-right = person's left (odd ids)
+  const sVL = add(neck, perp, -BONE.sh), sVR = add(neck, perp, BONE.sh), hVL = add(hip, perp, -BONE.hip), hVR = add(hip, perp, BONE.hip);
+  const [eVL, wVL] = limb(sVL, p.a, BONE.ua, BONE.fa, -1), [eVR, wVR] = limb(sVR, p.b, BONE.ua, BONE.fa, 1);
+  const [kVL, aVL] = limb(hVL, p.la, BONE.th, BONE.shin, -1), [kVR, aVR] = limb(hVR, p.lb, BONE.th, BONE.shin, 1);
+  const nose = add(neck, up, .085);
+  Object.assign(K, { 0: nose, 1: add(nose, perp, .018), 2: add(nose, perp, -.018), 3: add(nose, perp, .04), 4: add(nose, perp, -.04),
+    5: sVR, 6: sVL, 7: eVR, 8: eVL, 9: wVR, 10: wVL, 11: hVR, 12: hVL, 13: kVR, 14: kVL, 15: aVR, 16: aVL });
+  return K;
+}
+const lerpPose = (A, B, t) => { const o = {}; for (const k in A) o[k] = Array.isArray(A[k]) ? A[k].map((v, i) => v + (B[k][i] - v) * t) : A[k] + (B[k] - A[k]) * t; return o; };
+let gateRAF = 0, lastCount = -1;
+function sizeGate() { const dpr = window.devicePixelRatio || 1, w = gcv.clientWidth, h = gcv.clientHeight; gcv.width = w * dpr; gcv.height = h * dpr; gctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+function drawDancer(now) {
+  const W = gcv.clientWidth, H = gcv.clientHeight; if (!W || !H) return;
+  const bpm = 118, beatLen = 60000 / bpm, beatF = now / beatLen, beat = Math.floor(beatF), ph = beatF - beat;
+  const ease = t => 1 - Math.pow(1 - Math.min(1, t / .38), 3);
+  const P = lerpPose(POSES[(beat + 7) % 8], POSES[beat % 8], reduceMotion ? 1 : ease(ph));
+  P.y += reduceMotion ? 0 : Math.sin(ph * Math.PI) * -.012;
+  const K = poseKeypoints(P), s = Math.min(H * .95, W * 1.3), ox = W / 2 - s * .5, oy = H * .02;
+  const X = p => ox + p[0] * s, Y = p => oy + p[1] * s;
+  gctx.fillStyle = reduceMotion ? "#05030a" : "rgba(5,3,10,.32)"; gctx.fillRect(0, 0, W, H);
+  // spotlight + floor
+  const cx = X(K[11].map((v, i) => (v + K[12][i]) / 2));
+  const spot = gctx.createLinearGradient(0, 0, 0, H); spot.addColorStop(0, "rgba(255,61,139,.10)"); spot.addColorStop(1, "rgba(255,61,139,0)");
+  gctx.fillStyle = spot; gctx.beginPath(); gctx.moveTo(cx - 30, 0); gctx.lineTo(cx + 30, 0); gctx.lineTo(cx + s * .32, H * .93); gctx.lineTo(cx - s * .32, H * .93); gctx.closePath(); gctx.fill();
+  const floorY = Math.max(Y(K[15]), Y(K[16])) + 6, fl = gctx.createRadialGradient(cx, floorY, 4, cx, floorY, s * .3);
+  fl.addColorStop(0, `rgba(255,176,58,${.28 + (1 - ph) * .2})`); fl.addColorStop(1, "rgba(255,176,58,0)");
+  gctx.fillStyle = fl; gctx.beginPath(); gctx.ellipse(cx, floorY, s * .3, s * .045, 0, 0, 7); gctx.fill();
+  // skeleton
+  const g = gctx.createLinearGradient(0, Y(K[0]), 0, floorY); g.addColorStop(0, "#ff3d8b"); g.addColorStop(.55, "#ff6a5c"); g.addColorStop(1, "#ffb03a");
+  gctx.lineCap = "round"; gctx.lineJoin = "round"; gctx.strokeStyle = g; gctx.lineWidth = Math.max(4, s * .013);
+  gctx.shadowColor = "#ff3d8b"; gctx.shadowBlur = 22;
+  for (const [a, b] of SKEL) { if (a < 5 && b < 5) continue; gctx.beginPath(); gctx.moveTo(X(K[a]), Y(K[a])); gctx.lineTo(X(K[b]), Y(K[b])); gctx.stroke(); }
+  gctx.beginPath(); gctx.moveTo(X(K[0]), Y(K[0]) + s * .03); gctx.lineTo((X(K[5]) + X(K[6])) / 2, (Y(K[5]) + Y(K[6])) / 2); gctx.stroke();
+  gctx.beginPath(); gctx.arc(X(K[0]), Y(K[0]), s * .038, 0, 7); gctx.stroke();
+  gctx.shadowBlur = 0; gctx.fillStyle = "#fff";
+  for (let q = 5; q < 17; q++) { gctx.beginPath(); gctx.arc(X(K[q]), Y(K[q]), Math.max(2.5, s * .006), 0, 7); gctx.fill(); }
+  // detection box (YOLO nod)
+  const xs = K.map(X), ys = K.map(Y), x1 = Math.min(...xs) - 18, x2 = Math.max(...xs) + 18, y1 = Math.min(...ys) - s * .06, y2 = floorY + 4, c = 16;
+  gctx.strokeStyle = "rgba(56,225,240,.85)"; gctx.lineWidth = 1.5;
+  [[x1, y1, 1, 1], [x2, y1, -1, 1], [x1, y2, 1, -1], [x2, y2, -1, -1]].forEach(([x, y, dx, dy]) => { gctx.beginPath(); gctx.moveTo(x + dx * c, y); gctx.lineTo(x, y); gctx.lineTo(x, y + dy * c); gctx.stroke(); });
+  gctx.font = "600 11px 'IBM Plex Mono', monospace"; gctx.fillStyle = "rgba(56,225,240,.9)"; gctx.fillText(`PERSON 0.9${(beat % 7) + 2} · ${bpm} BPM`, x1, y1 - 8);
+  // counts
+  const cnt = beat % 8;
+  if (cnt !== lastCount) { lastCount = cnt; $$("#gateCounts i").forEach((el, i) => { el.classList.toggle("on", i === cnt); el.classList.toggle("one", i === 0 && cnt === 0); }); }
+}
+function gateLoop(t) { drawDancer(t); if (!reduceMotion) gateRAF = requestAnimationFrame(gateLoop); }
+function openGate() { gate.classList.remove("out"); sizeGate(); cancelAnimationFrame(gateRAF); gateRAF = requestAnimationFrame(gateLoop); }
+function closeGate() { gate.classList.add("out"); setTimeout(() => cancelAnimationFrame(gateRAF), 650); }
+window.addEventListener("resize", () => { if (!gate.classList.contains("out")) sizeGate(); });
+let entered = false; try { entered = sessionStorage.getItem("oppiy-in") === "1"; } catch {}
+if (entered) gate.classList.add("out"); else openGate();
+$("#gateForm").addEventListener("submit", e => { e.preventDefault(); try { sessionStorage.setItem("oppiy-in", "1"); } catch {} closeGate(); });
+$("#logoutBtn").addEventListener("click", () => { try { sessionStorage.removeItem("oppiy-in"); } catch {} openGate(); });
+
+/* ---------- tabs ---------- */
+function showView(name) {
+  $$("nav.tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.view === name)));
+  ["analyze", "history", "trend"].forEach(v => { $("#view-" + v).hidden = v !== name; $("#view-" + v).classList.toggle("hidden", v !== name); });
+  if (name === "history") renderHistory();
+  if (name === "trend") renderTrend();
+}
+$$("nav.tabs button").forEach(b => b.addEventListener("click", () => showView(b.dataset.view)));
+
+/* ---------- file input ---------- */
+const drop = $("#drop"), fileIn = $("#file");
+drop.addEventListener("click", () => fileIn.click());
+drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileIn.click(); } });
+["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) loadVideo(f); });
+fileIn.addEventListener("change", () => { if (fileIn.files[0]) loadVideo(fileIn.files[0]); });
+$("#fDate").value = new Date().toISOString().slice(0, 10);
+
+function loadVideo(f) {
+  videoFile = f; frames = []; current = null;
+  if (vid.src) URL.revokeObjectURL(vid.src);
+  vid.src = URL.createObjectURL(f);
+  vid.muted = true;
+  vid.onloadedmetadata = () => {
+    const W = vid.videoWidth, H = vid.videoHeight;
+    const maxW = 960; const s = Math.min(1, maxW / W);
+    view.width = Math.round(W * s); view.height = Math.round(H * s);
+    drop.classList.add("hidden"); view.classList.remove("hidden"); $("#stagebar").classList.remove("hidden");
+    $("#fEnd").value = Math.min(vid.duration, 180).toFixed(1);
+    $("#fEnd").max = vid.duration.toFixed(1);
+    if (!$("#fTitle").value) $("#fTitle").value = f.name.replace(/\.[^.]+$/, "");
+    $("#runBtn").disabled = false; $("#playBtn").disabled = false;
+    $("#setupNote").textContent = `${W}×${H}・${vid.duration.toFixed(1)}秒。最大180秒まで解析できます。`;
+    $("#progText").textContent = "準備OK";
+    vid.currentTime = Math.min(0.5, vid.duration / 2);
+  };
+  vid.onseeked = () => { if (!analyzing) drawFrame(nearestFrame(vid.currentTime)); };
+  $("#scorePanel").classList.add("hidden"); $("#resultDetail").classList.add("hidden");
+}
+
+/* ---------- model ---------- */
+async function getSession() {
+  if (session) return session;
+  if (typeof ort === "undefined") throw new Error("解析エンジンを読み込めませんでした。ページを開き直してください。");
+  setProg(0, "AIモデルを読み込み中…");
+  const [wasm, model] = await Promise.all([
+    fetch("./ort-wasm-simd-threaded.wasm").then(r => { if (!r.ok) throw new Error("wasm " + r.status); return r.arrayBuffer(); }),
+    fetch("./yolov8n-pose.onnx").then(r => { if (!r.ok) throw new Error("model " + r.status); return r.arrayBuffer(); }),
+  ]);
+  ort.env.wasm.numThreads = 1;
+  ort.env.wasm.proxy = false;
+  ort.env.wasm.wasmBinary = wasm;
+  ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/";
+  session = await ort.InferenceSession.create(model, { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
+  return session;
+}
+
+const S = 640;
+const lb = document.createElement("canvas"); lb.width = S; lb.height = S;
+const lbx = lb.getContext("2d", { willReadFrequently: true });
+const input = new Float32Array(3 * S * S);
+
+async function detect(sess) {
+  const W = vid.videoWidth, H = vid.videoHeight;
+  const sc = Math.min(S / W, S / H), nw = Math.round(W * sc), nh = Math.round(H * sc);
+  const px = Math.floor((S - nw) / 2), py = Math.floor((S - nh) / 2);
+  lbx.fillStyle = "rgb(114,114,114)"; lbx.fillRect(0, 0, S, S);
+  lbx.drawImage(vid, px, py, nw, nh);
+  const d = lbx.getImageData(0, 0, S, S).data, n = S * S;
+  for (let i = 0, j = 0; i < n; i++, j += 4) { input[i] = d[j] / 255; input[i + n] = d[j + 1] / 255; input[i + 2 * n] = d[j + 2] / 255; }
+  const out = await sess.run({ [sess.inputNames[0]]: new ort.Tensor("float32", input, [1, 3, S, S]) });
+  const o = out[sess.outputNames[0]].data, A = 8400;
+  const cand = [];
+  for (let i = 0; i < A; i++) {
+    const c = o[4 * A + i]; if (c < 0.35) continue;
+    const cx = (o[i] - px) / sc, cy = (o[A + i] - py) / sc, w = o[2 * A + i] / sc, h = o[3 * A + i] / sc;
+    const k = new Float32Array(51);
+    for (let q = 0; q < 17; q++) { k[q*3] = (o[(5+q*3)*A + i] - px) / sc; k[q*3+1] = (o[(6+q*3)*A + i] - py) / sc; k[q*3+2] = o[(7+q*3)*A + i]; }
+    cand.push({ c, x1: cx - w/2, y1: cy - h/2, x2: cx + w/2, y2: cy + h/2, k });
+  }
+  cand.sort((a, b) => b.c - a.c);
+  const keep = [];
+  for (const b of cand) { if (keep.every(k => iou(k, b) < 0.5)) keep.push(b); if (keep.length >= 10) break; }
+  return keep;
+}
+function iou(a, b) {
+  const ix = Math.max(0, Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1)), iy = Math.max(0, Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1));
+  const I = ix * iy, U = (a.x2-a.x1)*(a.y2-a.y1) + (b.x2-b.x1)*(b.y2-b.y1) - I; return U > 0 ? I / U : 0;
+}
+
+/* ---------- simple tracker ---------- */
+function makeTracker() {
+  let tracks = [], nextId = 0;
+  return (dets, t) => {
+    tracks = tracks.filter(tr => t - tr.t < 1.5);
+    const used = new Set();
+    for (const d of dets) {
+      const cx = (d.x1 + d.x2) / 2, cy = (d.y1 + d.y2) / 2, h = d.y2 - d.y1;
+      let best = null, bd = Infinity;
+      for (const tr of tracks) { if (used.has(tr)) continue; const dd = Math.hypot(tr.cx - cx, tr.cy - cy); if (dd < bd && dd < 0.6 * Math.max(h, tr.h)) { bd = dd; best = tr; } }
+      if (!best) { if (tracks.length >= 8) continue; best = { id: nextId++ }; tracks.push(best); }
+      Object.assign(best, { cx, cy, h, t }); used.add(best); d.id = best.id;
+    }
+    return dets.filter(d => d.id !== undefined);
+  };
+}
+
+/* ---------- drawing ---------- */
+function nearestFrame(t) {
+  if (!frames.length) return null;
+  let lo = 0, hi = frames.length - 1;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (frames[m].t < t) lo = m + 1; else hi = m; }
+  const f = frames[lo], g = frames[Math.max(0, lo - 1)];
+  const best = Math.abs(g.t - t) < Math.abs(f.t - t) ? g : f;
+  return Math.abs(best.t - t) < 0.4 ? best : null;
+}
+function drawFrame(fr) {
+  const s = view.width / vid.videoWidth;
+  vctx.drawImage(vid, 0, 0, view.width, view.height);
+  if (!fr) return;
+  vctx.lineCap = "round";
+  for (const p of fr.p) {
+    const col = colorFor(p.id);
+    vctx.strokeStyle = col; vctx.lineWidth = Math.max(2, view.width / 280);
+    for (const [a, b] of SKEL) {
+      if (p.k[a*3+2] < .35 || p.k[b*3+2] < .35) continue;
+      vctx.beginPath(); vctx.moveTo(p.k[a*3]*s, p.k[a*3+1]*s); vctx.lineTo(p.k[b*3]*s, p.k[b*3+1]*s); vctx.stroke();
+    }
+    vctx.fillStyle = "#fff";
+    for (let q = 0; q < 17; q++) if (p.k[q*3+2] >= .35) { vctx.beginPath(); vctx.arc(p.k[q*3]*s, p.k[q*3+1]*s, Math.max(2, view.width/360), 0, 7); vctx.fill(); }
+    const lab = p.label || ("#" + (p.id + 1));
+    vctx.font = `600 ${Math.max(11, view.width/70)}px ${css("--f-mono") || "monospace"}`;
+    const tx = p.box[0]*s, ty = Math.max(14, p.box[1]*s - 6);
+    vctx.fillStyle = col; vctx.fillRect(tx, ty - 14, vctx.measureText(lab).width + 10, 18);
+    vctx.fillStyle = "#14101a"; vctx.fillText(lab, tx + 5, ty);
+  }
+}
+let labelMap = {};
+function colorFor(id) { const i = labelMap[id]?.idx ?? id; return DANCER_COLORS[i % DANCER_COLORS.length]; }
+
+function setProg(f, text) { $("#progFill").style.width = (f * 100).toFixed(1) + "%"; $("#progText").textContent = text; }
+const seek = t => new Promise(res => { const h = () => { vid.removeEventListener("seeked", h); res(); }; vid.addEventListener("seeked", h); vid.currentTime = t; });
+
+/* ---------- playback with overlay ---------- */
+let playing = false;
+$("#playBtn").addEventListener("click", async () => {
+  if (analyzing) return;
+  if (playing) { vid.pause(); return; }
+  vid.muted = false;
+  try { await vid.play(); } catch { vid.muted = true; await vid.play().catch(() => {}); }
+});
+vid.addEventListener("play", () => { playing = true; $("#playBtn").textContent = "❚❚ 停止"; loop(); });
+vid.addEventListener("pause", () => { playing = false; $("#playBtn").textContent = "▶ 再生"; });
+function loop() { if (!playing) return; drawFrame(nearestFrame(vid.currentTime)); requestAnimationFrame(loop); }
+
+/* ---------- audio: tempo + beats ---------- */
+async function analyzeAudio(file, t0, t1) {
+  try {
+    const buf = await file.arrayBuffer();
+    const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const ac = new AC(1, 44100, 44100);
+    const audio = await ac.decodeAudioData(buf);
+    const sr = audio.sampleRate, ch = audio.numberOfChannels;
+    const a = Math.floor(t0 * sr), b = Math.min(audio.length, Math.floor(t1 * sr));
+    if (b - a < sr * 4) return null;
+    const mono = new Float32Array(b - a);
+    for (let c = 0; c < ch; c++) { const d = audio.getChannelData(c); for (let i = a; i < b; i++) mono[i - a] += d[i] / ch; }
+    const hop = 512, fr = sr / hop, n = Math.floor(mono.length / hop) - 1;
+    const le = new Float32Array(n);
+    for (let k = 0; k < n; k++) { let e = 0; for (let i = k * hop; i < k * hop + 1024 && i < mono.length; i++) { const v = i > 0 ? mono[i] - 0.97 * mono[i-1] : mono[i]; e += v * v; } le[k] = Math.log(1e-9 + e); }
+    const on = new Float32Array(n);
+    for (let k = 1; k < n; k++) on[k] = Math.max(0, le[k] - le[k - 1]);
+    const W = Math.round(fr * 0.5); const ons = new Float32Array(n);
+    let acc = 0; for (let k = 0; k < n; k++) { acc += on[k]; if (k >= W) acc -= on[k - W]; ons[k] = Math.max(0, on[k] - acc / Math.min(k + 1, W)); }
+    const minL = Math.floor(60 * fr / 180), maxL = Math.ceil(60 * fr / 70);
+    let best = 0, bestL = minL;
+    for (let L = minL; L <= maxL; L++) {
+      let s = 0; for (let k = L; k < n; k++) s += ons[k] * ons[k - L];
+      const bpm = 60 * fr / L, wgt = Math.exp(-0.5 * Math.pow(Math.log2(bpm / 120) / 0.9, 2));
+      s *= wgt; if (s > best) { best = s; bestL = L; }
+    }
+    // refine period fractionally
+    let period = bestL, bs = -1;
+    for (let L = bestL - 1; L <= bestL + 1; L += 0.05) {
+      let s = 0;
+      for (let k = Math.ceil(L); k < n; k++) { const j = k - L, j0 = Math.floor(j), f = j - j0; s += ons[k] * (ons[j0] * (1 - f) + (ons[j0 + 1] || 0) * f); }
+      if (s > bs) { bs = s; period = L; }
+    }
+    let bpm = 60 * fr / period;
+    while (bpm < 75) { bpm *= 2; period /= 2; } while (bpm > 165) { bpm /= 2; period *= 2; }
+    let bestP = 0, bp = -1;
+    for (let p = 0; p < period; p += 0.5) { let s = 0; for (let x = p; x < n; x += period) s += ons[Math.round(x)] || 0; if (s > bp) { bp = s; bestP = p; } }
+    const beats = []; for (let x = bestP; x < n; x += period) beats.push(t0 + x / fr);
+    return { bpm: Math.round(bpm * 10) / 10, beats };
+  } catch (e) { console.warn("audio", e); return null; }
+}
+
+/* ---------- run analysis ---------- */
+$("#runBtn").addEventListener("click", runAnalysis);
+$("#stopBtn").addEventListener("click", () => { stopFlag = true; });
+
+async function runAnalysis() {
+  if (!videoFile || analyzing) return;
+  vid.pause(); analyzing = true; stopFlag = false; frames = []; labelMap = {};
+  $("#runBtn").disabled = true; $("#stopBtn").classList.remove("hidden"); $("#playBtn").disabled = true;
+  $("#scorePanel").classList.add("hidden"); $("#resultDetail").classList.add("hidden");
+  const fps = +$("#fFps").value;
+  const t0 = clamp(+$("#fStart").value || 0, 0, vid.duration - 1);
+  const t1 = clamp(+$("#fEnd").value || vid.duration, t0 + 1, Math.min(vid.duration, t0 + 180));
+  try {
+    const sess = await getSession();
+    setProg(0, "音楽のテンポを測定中…");
+    const audioP = analyzeAudio(videoFile, t0, t1);
+    const track = makeTracker();
+    const total = Math.floor((t1 - t0) * fps);
+    const tStart = performance.now();
+    for (let i = 0; i <= total && !stopFlag; i++) {
+      const t = t0 + i / fps;
+      await seek(t);
+      const dets = track(await detect(sess), t);
+      const fr = { t, p: dets.map(d => ({ id: d.id, k: d.k, box: [d.x1, d.y1, d.x2, d.y2] })) };
+      frames.push(fr);
+      drawFrame(fr);
+      const el = (performance.now() - tStart) / 1000, rem = el / (i + 1) * (total - i);
+      setProg((i + 1) / (total + 1), `${t.toFixed(1)}秒 / 人数 ${dets.length} / 残り約${Math.ceil(rem)}秒`);
+    }
+    if (frames.length < fps * 2) throw new Error("解析できたコマが少なすぎます。もう少し長い範囲を選んでください。");
+    setProg(1, "スコアを計算中…");
+    const audio = await audioP;
+    current = buildRecord(computeMetrics(frames, fps, audio), { fps, t0, t1: frames[frames.length - 1].t, audio });
+    const ref = records.find(r => r.id === $("#fRef").value);
+    if (ref) { setProg(1, "見本と比較中…"); await new Promise(r => setTimeout(r, 30)); current.compare = compareWith(current, ref); current.refId = ref.id; }
+    renderResult(current, { target: "analyze", fresh: true });
+    setProg(1, stopFlag ? "途中で中止(ここまでで計算)" : "解析完了");
+  } catch (e) {
+    console.error(e);
+    setProg(0, "エラー");
+    $("#setupNote").textContent = "解析できませんでした:" + (e.message || e);
+  } finally {
+    analyzing = false; $("#runBtn").disabled = false; $("#stopBtn").classList.add("hidden"); $("#playBtn").disabled = false;
+  }
+}
+
+/* ---------- metrics ---------- */
+const pct = (arr, p) => { const a = arr.filter(Number.isFinite).sort((x, y) => x - y); if (!a.length) return NaN; const i = (a.length - 1) * p, l = Math.floor(i); return a[l] + (a[Math.min(a.length - 1, l + 1)] - a[l]) * (i - l); };
+const mean = a => { const b = a.filter(Number.isFinite); return b.length ? b.reduce((s, v) => s + v, 0) / b.length : NaN; };
+function corr(x, y) {
+  const n = x.length; if (n < 10) return NaN;
+  const mx = mean(x), my = mean(y); let sxy = 0, sx = 0, sy = 0;
+  for (let i = 0; i < n; i++) { const a = x[i] - mx, b = y[i] - my; sxy += a * b; sx += a * a; sy += b * b; }
+  return sx > 0 && sy > 0 ? sxy / Math.sqrt(sx * sy) : NaN;
+}
+function angle(k, a, b, c) {
+  if (k[a*3+2] < .35 || k[b*3+2] < .35 || k[c*3+2] < .35) return NaN;
+  const v1x = k[a*3] - k[b*3], v1y = k[a*3+1] - k[b*3+1], v2x = k[c*3] - k[b*3], v2y = k[c*3+1] - k[b*3+1];
+  return Math.atan2(v1x * v2y - v1y * v2x, v1x * v2x + v1y * v2y) * 180 / Math.PI;
+}
+const ANGLES = [[7,5,11],[8,6,12],[5,7,9],[6,8,10],[11,13,15],[12,14,16],[5,11,13],[6,12,14]];
+
+function computeMetrics(frames, fps, audio) {
+  const n = frames.length, dt = 1 / fps;
+  // collect tracks
+  const T = {};
+  frames.forEach((f, i) => f.p.forEach(p => { (T[p.id] ||= { id: p.id, at: new Array(n).fill(null) }).at[i] = p; }));
+  let main = Object.values(T).filter(tr => tr.at.filter(Boolean).length >= n * 0.3);
+  if (!main.length) main = Object.values(T).sort((a, b) => b.at.filter(Boolean).length - a.at.filter(Boolean).length).slice(0, 1);
+  if (!main.length) throw new Error("人物を検出できませんでした。全身が映っている動画で試してください。");
+  // label left→right
+  main.forEach(tr => { tr.mx = pct(tr.at.filter(Boolean).map(p => (p.box[0] + p.box[2]) / 2), .5); tr.scale = pct(tr.at.filter(Boolean).map(p => p.box[3] - p.box[1]), .5) || 1; });
+  main.sort((a, b) => a.mx - b.mx);
+  main.forEach((tr, i) => { tr.label = main.length > 1 ? `D${i + 1}` : "D1"; tr.idx = i; labelMap[tr.id] = { idx: i }; });
+  frames.forEach(f => f.p.forEach(p => { const tr = main.find(m => m.id === p.id); p.label = tr ? tr.label : "–"; }));
+
+  const per = main.map(tr => {
+    const sp = new Array(n).fill(NaN), spL = [], spR = [];
+    for (let i = 1; i < n; i++) {
+      const a = tr.at[i - 1], b = tr.at[i]; if (!a || !b) continue;
+      let s = 0, c = 0, l = 0, r = 0;
+      for (let q = 0; q < 17; q++) {
+        if (a.k[q*3+2] < .35 || b.k[q*3+2] < .35) continue;
+        const d = Math.hypot(b.k[q*3] - a.k[q*3], b.k[q*3+1] - a.k[q*3+1]) / tr.scale / dt;
+        s += d; c++; if (LEFT.includes(q)) l += d; if (RIGHT.includes(q)) r += d;
+      }
+      if (c >= 6) { sp[i] = s / c; spL.push(l); spR.push(r); }
+    }
+    // range: wrists & ankles relative to hip centre
+    const rel = { x: [[], [], [], []], y: [[], [], [], []] };
+    tr.at.forEach(p => {
+      if (!p || p.k[11*3+2] < .35 || p.k[12*3+2] < .35) return;
+      const hx = (p.k[33] + p.k[36]) / 2, hy = (p.k[34] + p.k[37]) / 2;
+      [9, 10, 15, 16].forEach((q, j) => { if (p.k[q*3+2] >= .35) { rel.x[j].push((p.k[q*3] - hx) / tr.scale); rel.y[j].push((p.k[q*3+1] - hy) / tr.scale); } });
+    });
+    const rng = mean([0, 1, 2, 3].map(j => (pct(rel.x[j], .95) - pct(rel.x[j], .05)) + (pct(rel.y[j], .95) - pct(rel.y[j], .05))));
+    const angles = ANGLES.map(([a, b, c]) => tr.at.map(p => p ? angle(p.k, a, b, c) : NaN));
+    const sl = spL.reduce((s, v) => s + v, 0), sr = spR.reduce((s, v) => s + v, 0);
+    const msp = mean(sp), p90 = pct(sp, .9), p25 = pct(sp, .25);
+    return {
+      label: tr.label, idx: tr.idx, presence: tr.at.filter(Boolean).length / n, sp, angles,
+      speed: msp, contrast: p90 / Math.max(p25, 0.02), range: rng, balance: sl + sr > 0 ? Math.min(sl, sr) / Math.max(sl, sr) : NaN,
+    };
+  });
+
+  // group energy series
+  const E = new Array(n).fill(0).map((_, i) => mean(per.map(p => p.sp[i])));
+  const Es = E.map((v, i) => { const a = E[i - 1], b = E[i + 1]; const vals = [a, v, v, b].filter(Number.isFinite); return vals.length ? vals.reduce((s, x) => s + x, 0) / vals.length : NaN; });
+  const med = pct(Es, .5);
+  const hits = [];
+  for (let i = 2; i < n - 1; i++) {
+    const v = Es[i]; if (!Number.isFinite(v)) continue;
+    if (!(v <= (Es[i - 1] ?? Infinity) && v < (Es[i + 1] ?? -Infinity))) continue;
+    let pk = 0; for (let j = Math.max(0, i - 4); j < i; j++) if (Es[j] > pk) pk = Es[j];
+    if (pk > 0.3 * med && v < 0.6 * pk) hits.push(frames[i].t);
+  }
+
+  // otohame
+  let otohame = null, onBeat = 0, grid = null, gridOffset = 0;
+  if (audio && audio.beats.length > 8) {
+    const ibi = 60 / audio.bpm, w = Math.max(0.1, 0.6 / fps);
+    const near = t => { let d = Infinity; for (const b of audio.beats) { const x = Math.abs(b - t); if (x < d) d = x; } return d; };
+    onBeat = hits.filter(t => near(t) <= w).length;
+    if (hits.length >= 4) {
+      const rate = onBeat / hits.length, exp = Math.min(0.9, 2 * w / ibi);
+      otohame = clamp((rate - exp) / (1 - exp)) * 100;
+    }
+    const tA = frames[0].t, tB = frames[n - 1].t;
+    const bts = audio.beats.filter(b => b >= tA && b <= tB);
+    grid = bts.map(b => {
+      const vals = frames.map((f, i) => Math.abs(f.t - b) <= ibi / 2 ? Es[i] : NaN);
+      return { e: mean(vals), h: hits.some(t => Math.abs(t - b) <= w) ? 1 : 0 };
+    });
+    const mx = Math.max(...grid.map(g => g.e).filter(Number.isFinite), 1e-6);
+    grid.forEach(g => g.e = Number.isFinite(g.e) ? r3(g.e / mx) : 0);
+    let bo = 0, bv = -1;
+    for (let k = 0; k < 8; k++) { let s = 0; grid.forEach((g, i) => { if ((i - k + 80) % 8 === 0) s += g.h * 2 + g.e; else if ((i - k + 80) % 4 === 0) s += 0.5 * (g.h + g.e); }); if (s > bv) { bv = s; bo = k; } }
+    gridOffset = bo;
+  }
+
+  // sync between dancers
+  let sync = null; const pairR = per.map(() => []);
+  if (per.length >= 2) {
+    for (let a = 0; a < per.length; a++) for (let b = a + 1; b < per.length; b++) {
+      const rs = [];
+      ANGLES.forEach((_, j) => {
+        const x = [], y = [];
+        for (let i = 0; i < n; i++) { const u = per[a].angles[j][i], v = per[b].angles[j][i]; if (Number.isFinite(u) && Number.isFinite(v)) { x.push(u); y.push(v); } }
+        const r = corr(x, y); if (Number.isFinite(r)) rs.push(r);
+      });
+      const r = mean(rs); if (Number.isFinite(r)) { pairR[a].push(r); pairR[b].push(r); }
+    }
+    const all = pairR.flat(); if (all.length) sync = clamp(mean(all) / 0.8) * 100;
+  }
+
+  const sizeOf = s => clamp(1 - Math.exp(-s / 0.6)) * 100;
+  const meriOf = c => clamp((c - 1.2) / 3.3) * 100;
+  const rangeOf = r => clamp((r - 0.3) / 2.2) * 100;
+  const dancers = per.map((p, i) => ({
+    label: p.label, presence: r3(p.presence),
+    size: Math.round(sizeOf(p.speed)), merihari: Math.round(meriOf(p.contrast)), range: Math.round(rangeOf(p.range)),
+    balance: Number.isFinite(p.balance) ? Math.round(p.balance * 100) : null,
+    sync: pairR[i].length ? Math.round(clamp(mean(pairR[i]) / 0.8) * 100) : null,
+  }));
+  const scores = {
+    size: Math.round(mean(per.map(p => sizeOf(p.speed)))),
+    merihari: Math.round(mean(per.map(p => meriOf(p.contrast)))),
+    otohame: otohame == null ? null : Math.round(otohame),
+    range: Math.round(mean(per.map(p => rangeOf(p.range)))),
+    balance: Math.round(mean(per.map(p => p.balance * 100))),
+    sync: sync == null ? null : Math.round(sync),
+  };
+  for (const k in scores) if (!Number.isFinite(scores[k])) scores[k] = null;
+  let ws = 0, tot = 0; METRICS.forEach(m => { if (scores[m.key] != null) { tot += scores[m.key] * m.w; ws += m.w; } });
+  scores.total = ws ? Math.round(tot / ws) : null;
+
+  // energy downsample to 4/sec
+  const bin = Math.max(1, Math.round(fps / 4)), energy = [];
+  for (let i = 0; i < n; i += bin) energy.push(r3(mean(Es.slice(i, i + bin)) || 0));
+  // joint-angle series for comparison with a reference (unsigned 0-180°, ~4 frames/sec, -1 = not visible)
+  const keepD = per.slice(0, 6);
+  let step = Math.max(1, Math.round(fps / 4));
+  while (Math.ceil(n / step) * 8 * (keepD.length + 1) > 36000) step++;
+  const pack = getA => { const out = []; for (let i = 0; i < n; i += step) for (let j = 0; j < 8; j++) { const v = getA(j, i); out.push(Number.isFinite(v) ? Math.round(Math.abs(v)) : -1); } return out; };
+  const angleStore = {
+    fps: r3(fps / step), t0: r3(frames[0].t), n: Math.ceil(n / step),
+    dancers: keepD.map(p => pack((j, i) => p.angles[j][i])),
+    mean: pack((j, i) => mean(per.map(p => Math.abs(p.angles[j][i])))),
+    energy: (() => { const o = []; for (let i = 0; i < n; i += step) o.push(r3(Es[i] || 0)); return o; })(),
+  };
+  return { scores, dancers, energy, energyStep: bin / fps, hits: hits.map(r3), onBeat, grid, gridOffset, people: per.length, angleStore };
+}
+
+function makeThumb() {
+  const c = document.createElement("canvas"), w = 240, h = Math.round(240 * view.height / view.width);
+  c.width = w; c.height = h; c.getContext("2d").drawImage(view, 0, 0, w, h);
+  return c.toDataURL("image/jpeg", 0.6);
+}
+function buildRecord(m, o) {
+  return {
+    title: $("#fTitle").value.trim() || "無題の解析", dancer: $("#fDancer").value.trim() || "未設定", song: $("#fSong").value.trim(),
+    date: $("#fDate").value || new Date().toISOString().slice(0, 10), createdAt: Date.now(),
+    fps: o.fps, start: r3(o.t0), end: r3(o.t1), duration: r3(o.t1 - o.t0),
+    bpm: o.audio ? o.audio.bpm : null, beatsCount: o.audio ? o.audio.beats.filter(b => b >= o.t0 && b <= o.t1).length : 0,
+    people: m.people, scores: m.scores, dancers: m.dancers, energy: m.energy, energyStep: m.energyStep,
+    hits: m.hits, onBeat: m.onBeat, grid: m.grid, gridOffset: m.gridOffset, thumb: makeThumb(), coach: "", sample: false,
+    angles: m.angleStore, isRef: false, refId: null, compare: null,
+  };
+}
+
+/* ---------- result rendering ---------- */
+function barColor(v) { return v == null ? "var(--line)" : v >= 70 ? "var(--good)" : v >= 45 ? "var(--warn)" : "var(--bad)"; }
+function fmtDate(d) { return d ? d.replace(/-/g, ".") : ""; }
+
+function renderResult(rec, { target, fresh, id }) {
+  const panel = target === "analyze" ? $("#scorePanel") : null;
+  if (panel) {
+    panel.classList.remove("hidden");
+    $("#scoreKicker").textContent = fresh ? "解析結果(未保存)" : "解析結果";
+    $("#totalNum").textContent = rec.scores.total ?? "–";
+    $("#totalTitle").textContent = rec.title;
+    $("#totalSub").textContent = `${rec.dancer}・${rec.people}人・${rec.duration.toFixed(1)}秒`;
+    $("#scoreChips").innerHTML = (rec.bpm ? `<span class="chip beat">BPM ${rec.bpm}</span>` : `<span class="chip">音声なし</span>`) + `<span class="chip acc">${rec.fps}コマ/秒</span>`;
+    $("#metrics").innerHTML = metricRows(rec.scores);
+    $("#saveRow").classList.toggle("hidden", !fresh);
+    $("#saveBtn").disabled = !canWrite; $("#saveNote").textContent = canWrite ? "" : "閲覧のみの権限のため保存できません";
+  }
+  const host = target === "analyze" ? $("#resultDetail") : $("#historyDetail");
+  host.classList.remove("hidden");
+  host.innerHTML = detailHTML(rec, target !== "analyze", id);
+  drawEnergy(host.querySelector("canvas.energy"), rec);
+  const prev = previousOf(rec);
+  drawRadar(host.querySelector("canvas.radar"), [
+    ...(prev ? [{ s: prev.scores, color: css("--beat"), dash: true }] : []),
+    { s: rec.scores, color: css("--accent") },
+  ]);
+  drawDancerBars(host.querySelector("canvas.dbars"), rec);
+  wireCompare(host, rec, id);
+  host.querySelector("[data-refmark]")?.addEventListener("click", async e => {
+    const b = e.currentTarget; b.disabled = true;
+    try { await db.collection("analyses").doc(id).update({ isRef: !rec.isRef }); rec.isRef = !rec.isRef; b.textContent = rec.isRef ? "見本から外す" : "見本にする"; } catch { b.textContent = "変更できませんでした"; }
+    b.disabled = false;
+  });
+  host.querySelector("[data-coach]")?.addEventListener("click", e => runCoach(rec, id, e.currentTarget));
+  host.querySelector("[data-del]")?.addEventListener("click", () => confirmDelete(id, host));
+  host.querySelector("[data-close]")?.addEventListener("click", () => { host.classList.add("hidden"); host.innerHTML = ""; });
+}
+function metricRows(sc) {
+  return METRICS.map(m => {
+    const v = sc[m.key];
+    return `<div class="metric ${v == null ? "na" : ""}"><div class="k">${m.name}<small>${m.hint}</small></div><div class="bar"><i style="width:${v ?? 0}%;background:${barColor(v)};color:${barColor(v)}"></i></div><div class="v">${v ?? "—"}</div></div>`;
+  }).join("");
+}
+function insights(rec) {
+  const avail = METRICS.filter(m => rec.scores[m.key] != null).map(m => ({ ...m, v: rec.scores[m.key] })).sort((a, b) => b.v - a.v);
+  if (!avail.length) return "";
+  const top = avail[0], low = avail[avail.length - 1];
+  const lines = [`いちばん良いのは「${top.name}」(${top.v})。`];
+  if (low !== top) lines.push(`伸びしろは「${low.name}」(${low.v})。`);
+  if (rec.scores.otohame == null && rec.bpm == null) lines.push("音声が取れなかったため音ハメは未計測です。");
+  if (rec.people >= 2 && rec.dancers.some(d => d.sync != null)) {
+    const off = [...rec.dancers].filter(d => d.sync != null).sort((a, b) => a.sync - b.sync)[0];
+    if (off) lines.push(`揃いが一番低いのは ${off.label}(${off.sync})。`);
+  }
+  return lines.join("");
+}
+function detailHTML(rec, standalone, id) {
+  const head = standalone ? `
+    <div class="panel">
+      <div class="row" style="justify-content:space-between">
+        <span class="kicker">${fmtDate(rec.date)}・${esc(rec.dancer)}${rec.sample ? "・サンプル" : ""}${rec.isRef ? "・見本" : ""}</span>
+        <div class="row"><button class="btn sm ghost" data-close>閉じる</button>${canWrite && db && id && !String(id).startsWith("local-") ? `<button class="btn sm ghost" data-refmark>${rec.isRef ? "見本から外す" : "見本にする"}</button>` : ""}${canWrite && id ? `<button class="btn sm ghost" data-del>この記録を削除</button>` : ""}</div>
+      </div>
+      <div class="total" style="margin-top:8px"><div class="num">${rec.scores.total ?? "–"}</div><div class="meta"><span>総合スコア</span><b>${esc(rec.title)}</b><span>${esc(rec.song || "")} ${rec.bpm ? "BPM " + rec.bpm : ""}・${rec.people}人・${(+rec.duration).toFixed(1)}秒</span></div></div>
+      <div class="metrics">${metricRows(rec.scores)}</div>
+    </div>` : "";
+  const ins = insights(rec);
+  const dancersT = rec.dancers.length ? `
+    <div class="sec"><h2>ダンサー別</h2><p class="lead">左から順に D1, D2… と番号をつけています。揃いは「他のメンバーとの関節角度の一致度」です。</p>
+    <div class="tablewrap panel" style="padding:6px 10px"><table class="t"><thead><tr><th>ダンサー</th><th>映っていた割合</th><th>動きの大きさ</th><th>メリハリ</th><th>可動域</th><th>左右バランス</th><th>揃い</th></tr></thead><tbody>
+    ${rec.dancers.map((d, i) => `<tr><td><span class="dot" style="background:${DANCER_COLORS[i % 8]};color:${DANCER_COLORS[i % 8]}"></span><b>${d.label}</b></td><td class="n">${Math.round(d.presence * 100)}%</td><td class="n">${d.size ?? "—"}</td><td class="n">${d.merihari ?? "—"}</td><td class="n">${d.range ?? "—"}</td><td class="n">${d.balance ?? "—"}</td><td class="n">${d.sync ?? "—"}</td></tr>`).join("")}
+    </tbody></table></div></div>` : "";
+  const grid = rec.grid && rec.grid.length ? eightsHTML(rec) : `<div class="empty">音声からテンポを取れなかったため、カウント表は表示できません。</div>`;
+  const coach = `
+    <div class="sec"><h2>AIコーチのコメント</h2><p class="lead">数値をもとに、良い点・伸ばす点・次の練習メニューをまとめます。</p>
+    <div class="panel"><div class="coach" data-coachtext>${rec.coach ? esc(rec.coach) : `<span class="note">${esc(ins)}</span>`}</div>
+    <div class="row" style="margin-top:12px"><button class="btn sm" data-coach>${rec.coach ? "コメントを作り直す" : "AIコーチにコメントをもらう"}</button><span class="note" data-coachnote></span></div></div></div>`;
+  const prev = previousOf(rec);
+  const charts = `
+    <div class="sec charts2">
+      <div class="panel"><h3>スコアのバランス(レーダー)</h3>
+        <div class="radarbox"><canvas class="radar" width="360" height="320"></canvas></div>
+        <div class="legend"><span><i style="background:var(--accent)"></i>この記録</span>${prev ? `<span><i style="background:var(--beat)"></i>前回 ${fmtDate(prev.date)}</span>` : `<span class="note">同じダンサー/チームの記録が貯まると前回と重ねて表示します</span>`}</div>
+      </div>
+      <div class="panel"><h3>ダンサー別の比較(棒グラフ)</h3>
+        <div class="chartbox" style="border:0;padding:0"><canvas class="dbars" height="300"></canvas></div>
+        <div class="legend">${rec.dancers.map((d, i) => `<span><i style="background:${DANCER_COLORS[i % 8]}"></i>${d.label}</span>`).join("")}</div>
+      </div>
+    </div>`;
+  return `${head}${charts}
+    <div class="sec"><h2>動きの強さの流れ</h2><p class="lead">全員の関節の速さの平均。縦の線は拍(太い線が8カウントの「1」)、青い点は動きを止めた「決め」の瞬間です。</p>
+    <div class="chartbox"><canvas class="energy" height="200"></canvas></div>
+    <div class="legend"><span><i style="background:var(--accent)"></i>動きの強さ</span><span><i style="background:var(--beat)"></i>決め(拍に乗った)</span><span><i style="background:var(--muted)"></i>決め(拍からずれた)</span></div></div>
+    <div class="sec"><h2>カウント表</h2><p class="lead">1エイト(8カウント)ごとに、その拍での動きの強さを色の濃さで、拍に乗った決めを点で表示。${rec.bpm ? `テンポ ${rec.bpm} BPM、決め ${rec.hits.length}回のうち ${rec.onBeat}回が拍の上。` : ""}</p>${grid}</div>
+    ${dancersT}<div data-cmpbox>${compareHTML(rec, standalone)}</div>${coach}`;
+}
+function previousOf(rec) {
+  const ts = rec.createdAt || Date.now();
+  return records.filter(r => r.dancer === rec.dancer && r.id !== rec.id && r.id !== rec._id && (r.date + r.createdAt) < (rec.date + ts))
+    .sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt))[0] || null;
+}
+function hiDPI(cv, W, H) {
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + "px"; cv.style.height = H + "px";
+  const c = cv.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0); return c;
+}
+/* radar: series = [{s: scores, color, dash}] — last one is drawn on top with value labels */
+function drawRadar(cv, series) {
+  if (!cv) return;
+  const W = Math.min(cv.parentElement.clientWidth || 360, 420), H = Math.round(W * 0.86);
+  const c = hiDPI(cv, W, H), cx = W / 2, cy = H / 2 + 4, R = Math.min(W, H) / 2 - 46, N = METRICS.length;
+  const ang = i => -Math.PI / 2 + i * 2 * Math.PI / N;
+  const pt = (i, v) => [cx + Math.cos(ang(i)) * R * v / 100, cy + Math.sin(ang(i)) * R * v / 100];
+  c.strokeStyle = css("--line"); c.lineWidth = 1; c.font = `11px ${css("--f-mono")}`;
+  [25, 50, 75, 100].forEach(v => { c.beginPath(); for (let i = 0; i <= N; i++) { const [x, y] = pt(i % N, v); i ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke(); });
+  for (let i = 0; i < N; i++) { const [x, y] = pt(i, 100); c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke(); }
+  c.fillStyle = css("--muted"); c.textAlign = "left"; [50, 100].forEach(v => c.fillText(v, cx + 3, cy - R * v / 100 + 11));
+  series.forEach((sr, si) => {
+    const top = si === series.length - 1;
+    c.beginPath();
+    METRICS.forEach((m, i) => { const [x, y] = pt(i, sr.s[m.key] ?? 0); i ? c.lineTo(x, y) : c.moveTo(x, y); });
+    c.closePath();
+    c.fillStyle = sr.color; c.globalAlpha = top ? .2 : .08; c.fill(); c.globalAlpha = 1;
+    c.strokeStyle = sr.color; c.lineWidth = top ? 2.4 : 1.6; c.setLineDash(sr.dash ? [5, 4] : []); c.shadowColor = sr.color; c.shadowBlur = top ? 14 : 0; c.stroke(); c.shadowBlur = 0; c.setLineDash([]);
+    METRICS.forEach((m, i) => { const v = sr.s[m.key]; if (v == null) return; const [x, y] = pt(i, v); c.fillStyle = top ? sr.color : css("--surface"); c.strokeStyle = sr.color; c.lineWidth = 1.5; c.beginPath(); c.arc(x, y, top ? 3.5 : 2.5, 0, 7); c.fill(); c.stroke(); });
+  });
+  const last = series[series.length - 1].s;
+  METRICS.forEach((m, i) => {
+    const [x, y] = pt(i, 122), v = last[m.key];
+    c.textAlign = Math.abs(x - cx) < 8 ? "center" : x > cx ? "left" : "right";
+    c.font = `700 12px ${css("--f-body")}`; c.fillStyle = css("--ink"); c.fillText(m.name, x, y);
+    c.font = `600 11px ${css("--f-mono")}`; c.fillStyle = v == null ? css("--muted") : css("--accent"); c.fillText(v == null ? "未計測" : v, x, y + 14);
+  });
+}
+/* grouped horizontal bars: one group per metric, one bar per dancer */
+function drawDancerBars(cv, rec) {
+  if (!cv) return;
+  const keys = [["size", "動きの大きさ"], ["merihari", "メリハリ"], ["range", "可動域"], ["balance", "左右バランス"], ["sync", "揃い"]];
+  const ds = rec.dancers.length ? rec.dancers : [];
+  const bh = Math.max(5, Math.min(12, 44 / Math.max(1, ds.length))), gap = 14;
+  const groupH = ds.length * (bh + 2) + gap;
+  const W = Math.max(cv.parentElement.clientWidth || 360, 300), H = keys.length * groupH + 26;
+  const c = hiDPI(cv, W, H), padL = 92, padR = 30, pw = W - padL - padR;
+  c.font = `11px ${css("--f-mono")}`;
+  c.strokeStyle = css("--line"); c.fillStyle = css("--muted"); c.textAlign = "center";
+  [0, 50, 100].forEach(v => { const x = padL + pw * v / 100; c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H - 18); c.stroke(); c.fillText(v, x, H - 4); });
+  keys.forEach(([k, name], gi) => {
+    const y0 = gi * groupH + 4;
+    c.textAlign = "right"; c.font = `700 12px ${css("--f-body")}`; c.fillStyle = css("--ink");
+    c.fillText(name, padL - 10, y0 + (ds.length * (bh + 2)) / 2 + 4);
+    ds.forEach((d, i) => {
+      const v = d[k], y = y0 + i * (bh + 2);
+      if (v == null) { c.fillStyle = css("--muted"); c.font = `10px ${css("--f-mono")}`; c.textAlign = "left"; c.fillText("—", padL + 4, y + bh - 1); return; }
+      c.fillStyle = DANCER_COLORS[i % 8]; c.beginPath(); c.roundRect ? c.roundRect(padL, y, pw * v / 100, bh, 3) : c.rect(padL, y, pw * v / 100, bh); c.fill();
+      if (ds.length <= 4) { c.fillStyle = css("--muted"); c.font = `10px ${css("--f-mono")}`; c.textAlign = "left"; c.fillText(v, padL + pw * v / 100 + 4, y + bh - 1); }
+    });
+  });
+}
+/* ---------- reference (見本) comparison ---------- */
+const JOINTS = ["左肩", "右肩", "左肘", "右肘", "左膝", "右膝", "左股関節", "右股関節"];
+const GRID_FPS = 4;
+function toRows(store, flat) {
+  const src = store.n, rows = [], total = Math.floor((src - 1) / store.fps * GRID_FPS) + 1;
+  for (let k = 0; k < total; k++) {
+    const i = Math.min(src - 1, Math.round(k * store.fps / GRID_FPS)), r = new Float32Array(8);
+    for (let j = 0; j < 8; j++) { const v = flat[i * 8 + j]; r[j] = v < 0 ? NaN : v; }
+    rows.push(r);
+  }
+  return rows;
+}
+const energyRows = store => { const o = [], total = Math.floor((store.n - 1) / store.fps * GRID_FPS) + 1; for (let k = 0; k < total; k++) o.push(store.energy[Math.min(store.n - 1, Math.round(k * store.fps / GRID_FPS))] || 0); return o; };
+const mirrorRow = r => Float32Array.from([r[1], r[0], r[3], r[2], r[5], r[4], r[7], r[6]]);
+function rowCost(a, b) { let s = 0, c = 0; for (let j = 0; j < 8; j++) { const d = a[j] - b[j]; if (d === d) { s += Math.abs(d); c++; } } return c >= 3 ? s / c : 40; }
+function subDTW(A, B) {
+  const n = A.length, m = B.length, pen = 3;
+  const C = new Float32Array(n * m), D = new Float32Array(n * m), P = new Uint8Array(n * m);
+  for (let i = 0; i < n; i++) for (let j = 0; j < m; j++) C[i * m + j] = rowCost(A[i], B[j]);
+  for (let j = 0; j < m; j++) D[j] = C[j];
+  for (let i = 1; i < n; i++) {
+    D[i * m] = D[(i - 1) * m] + C[i * m] + pen; P[i * m] = 1;
+    for (let j = 1; j < m; j++) {
+      const dg = D[(i - 1) * m + j - 1], up = D[(i - 1) * m + j] + pen, lf = D[i * m + j - 1] + pen;
+      let best = dg, p = 0; if (up < best) { best = up; p = 1; } if (lf < best) { best = lf; p = 2; }
+      D[i * m + j] = C[i * m + j] + best; P[i * m + j] = p;
+    }
+  }
+  let jEnd = 0; for (let j = 1; j < m; j++) if (D[(n - 1) * m + j] < D[(n - 1) * m + jEnd]) jEnd = j;
+  const path = []; let i = n - 1, j = jEnd;
+  while (i >= 0) { path.push([i, j, C[i * m + j]]); if (i === 0) break; const p = P[i * m + j]; if (p === 0) { i--; j--; } else if (p === 1) i--; else j--; if (j < 0) j = 0; }
+  path.reverse();
+  return { path, cost: path.reduce((s, x) => s + x[2], 0) / path.length };
+}
+function summarizePath(A, B, res, t0) {
+  const { path } = res, perJ = new Array(8).fill(0), cnt = new Array(8).fill(0), firstJ = {};
+  path.forEach(([i, j]) => { if (firstJ[i] === undefined) firstJ[i] = j; for (let q = 0; q < 8; q++) { const d = A[i][q] - B[j][q]; if (d === d) { perJ[q] += Math.abs(d); cnt[q]++; } } });
+  const joints = perJ.map((s, q) => cnt[q] ? Math.round(s / cnt[q]) : null);
+  const j0 = path[0][1];
+  // lag_i = practice elapsed - reference elapsed (positive = later than 見本)
+  const lagSeries = Object.keys(firstJ).map(Number).sort((a, b) => a - b).map(i => [r3(t0 + i / GRID_FPS), r3(i / GRID_FPS - (firstJ[i] - j0) / GRID_FPS)]);
+  const lv = lagSeries.map(x => x[1]), med = pct(lv, .5), spread = mean(lv.map(v => Math.abs(v - med)));
+  return { joints, lagSeries, medLag: r3(med), spread: r3(spread), sim: Math.round(clamp(1 - res.cost / 45) * 100), timing: Math.round(clamp(1 - spread / 0.6) * 100), j0, j1: path[path.length - 1][1] };
+}
+function compareWith(rec, ref) {
+  if (!rec.angles || !ref.angles) return { error: "この記録か見本に、比較用の関節データがありません(古い記録の可能性)。もう一度解析してください。" };
+  const B = toRows(ref.angles, ref.angles.mean), Bm = B.map(mirrorRow);
+  const A = toRows(rec.angles, rec.angles.mean);
+  if (A.length < 8 || B.length < 8) return { error: "比較するには2秒以上の動画が必要です。" };
+  const straight = subDTW(A, B), mirrored = subDTW(A, Bm);
+  const useMirror = mirrored.cost < straight.cost * 0.92;
+  const R = useMirror ? Bm : B, best = useMirror ? mirrored : straight;
+  const sum = summarizePath(A, R, best, rec.angles.t0);
+  // segments of 2 s
+  const seg = [], blk = GRID_FPS * 2;
+  for (let s = 0; s < A.length; s += blk) {
+    const pts = best.path.filter(([i]) => i >= s && i < s + blk); if (!pts.length) continue;
+    const pj = new Array(8).fill(0), pc = new Array(8).fill(0);
+    pts.forEach(([i, j]) => { for (let q = 0; q < 8; q++) { const d = A[i][q] - R[j][q]; if (d === d) { pj[q] += Math.abs(d); pc[q]++; } } });
+    let wq = 0, wv = -1; pj.forEach((v, q) => { const m = pc[q] ? v / pc[q] : -1; if (m > wv) { wv = m; wq = q; } });
+    seg.push({ t: r3(rec.angles.t0 + s / GRID_FPS), sim: Math.round(clamp(1 - mean(pts.map(p => p[2])) / 45) * 100), joint: wq });
+  }
+  const eA = energyRows(rec.angles), eB = energyRows(ref.angles);
+  const ea = mean(best.path.map(([i]) => eA[i])), eb = mean(best.path.map(([, j]) => eB[j]));
+  const dancers = (rec.angles.dancers || []).map((flat, d) => {
+    const Ad = toRows(rec.angles, flat), res = subDTW(Ad, R), s = summarizePath(Ad, R, res, rec.angles.t0);
+    const wq = s.joints.reduce((b, v, q) => (v ?? -1) > (s.joints[b] ?? -1) ? q : b, 0);
+    return { label: rec.dancers[d]?.label || `D${d + 1}`, sim: s.sim, timing: s.timing, medLag: s.medLag, worst: JOINTS[wq], worstDeg: s.joints[wq] };
+  });
+  const step = Math.max(1, Math.ceil(sum.lagSeries.length / 300));
+  return {
+    refId: ref.id, refTitle: ref.title, refDate: ref.date, refScores: ref.scores, mirrored: useMirror,
+    similarity: sum.sim, timing: sum.timing, medLag: sum.medLag, spread: sum.spread,
+    energyRatio: eb > 0 ? Math.round(ea / eb * 100) : null, joints: sum.joints,
+    refSpan: [r3(ref.angles.t0 + sum.j0 / GRID_FPS), r3(ref.angles.t0 + sum.j1 / GRID_FPS)],
+    lag: sum.lagSeries.filter((_, i) => i % step === 0), segments: seg, dancers,
+  };
+}
+function compareHTML(rec, standalone) {
+  const refs = records.filter(r => r.isRef && r.id !== rec.id && r.id !== rec._id);
+  const sel = `<label class="f" style="max-width:340px">比較する見本<select data-refsel><option value="">選んでください</option>${refs.map(r => `<option value="${esc(r.id)}" ${rec.compare?.refId === r.id ? "selected" : ""}>${esc(r.title)}(${fmtDate(r.date)})</option>`).join("")}</select></label>`;
+  const intro = `<div class="sec"><h2>見本との比較</h2><p class="lead">先生やお手本の動画を「見本」として登録しておくと、関節の角度の動きを時間軸で合わせて比べます。始まりのタイミングや少しのテンポのズレは自動で吸収します。</p>`;
+  if (!refs.length && !rec.compare) return intro + `<div class="empty">まだ見本がありません。お手本の動画を解析し、保存するときに「見本として登録する」にチェックを入れてください。</div></div>`;
+  const cmp = rec.compare;
+  if (!cmp) return intro + `<div class="panel">${sel}</div></div>`;
+  if (cmp.error) return intro + `<div class="panel">${sel}<p class="note">${esc(cmp.error)}</p></div></div>`;
+  const lagTxt = Math.abs(cmp.medLag) < 0.08 ? "ほぼ見本どおり" : cmp.medLag > 0 ? `見本より平均 ${cmp.medLag.toFixed(2)}秒 遅れ気味` : `見本より平均 ${Math.abs(cmp.medLag).toFixed(2)}秒 早め`;
+  const worst = [...cmp.segments].sort((a, b) => a.sim - b.sim).slice(0, 3);
+  const tA = cmp.segments[0]?.t ?? 0, tB = (cmp.segments[cmp.segments.length - 1]?.t ?? 0) + 2;
+  return intro + `
+    <div class="panel">
+      <div class="row" style="justify-content:space-between;align-items:flex-end">${sel}<div class="chips">${cmp.mirrored ? `<span class="chip ref">見本を左右反転して比較</span>` : ""}<span class="chip">見本の ${cmp.refSpan[0].toFixed(1)}〜${cmp.refSpan[1].toFixed(1)}秒 と対応</span></div></div>
+      <div class="cmp-head" style="margin-top:14px"><div class="num">${cmp.similarity}</div><div class="meta"><span>見本との振りの一致度</span><b>${esc(cmp.refTitle)}</b><span>タイミングの安定 ${cmp.timing}・${lagTxt}${cmp.energyRatio != null ? `・動きの大きさは見本の ${cmp.energyRatio}%` : ""}</span></div></div>
+    </div>
+    <div class="sec charts2">
+      <div class="panel"><h3>見本とのバランス比較(レーダー)</h3>
+        <div class="radarbox"><canvas class="cmpradar" width="360" height="320"></canvas></div>
+        <div class="legend"><span><i style="background:var(--beat)"></i>見本</span><span><i style="background:var(--accent)"></i>この記録</span></div></div>
+      <div class="panel"><h3>部位ごとの角度のズレ(棒グラフ)</h3>
+        <div class="chartbox" style="border:0;padding:0"><canvas class="jointbars" height="260"></canvas></div>
+        <p class="note" style="margin:6px 0 0">見本と比べて、各関節の曲げ角度が平均で何度ちがうか。15°以内は緑、30°を超えると赤。</p></div>
+    </div>
+    <div class="sec"><h2>どこでズレたか</h2><p class="lead">2秒ごとの一致度(緑ほど見本に近い)と、見本に対する遅れ・早さの動き。</p>
+      <div class="panel">
+        <div class="strip">${cmp.segments.map(s => `<i style="background:${barColor(s.sim)}" title="${s.t.toFixed(0)}秒〜 一致度 ${s.sim}・${JOINTS[s.joint]}"></i>`).join("")}</div>
+        <div class="striplab"><span>${tA.toFixed(0)}s</span><span>${tB.toFixed(0)}s</span></div>
+        <div class="chartbox" style="border:0;padding:0;margin-top:12px"><canvas class="lagchart" height="170"></canvas></div>
+        <div class="worst"><span class="kicker">ズレが大きい場面</span>${worst.map(s => `<div><span class="tm">${s.t.toFixed(1)}〜${(s.t + 2).toFixed(1)}秒</span><span>一致度 <b>${s.sim}</b>・特に${JOINTS[s.joint]}</span>${!standalone && videoFile ? `<button class="btn sm" data-seek="${s.t}">この場面を見る</button>` : ""}</div>`).join("")}</div>
+      </div></div>
+    ${cmp.dancers.length > 1 ? `<div class="sec"><h2>ダンサー別の見本との一致</h2>
+      <div class="tablewrap panel" style="padding:6px 10px"><table class="t"><thead><tr><th>ダンサー</th><th>振りの一致度</th><th>タイミングの安定</th><th>遅れ・早さ</th><th>一番ズレた部位</th></tr></thead><tbody>
+      ${cmp.dancers.map((d, i) => `<tr><td><span class="dot" style="background:${DANCER_COLORS[i % 8]};color:${DANCER_COLORS[i % 8]}"></span><b>${d.label}</b></td><td class="n">${d.sim}</td><td class="n">${d.timing}</td><td class="n">${d.medLag > 0 ? "+" : ""}${d.medLag.toFixed(2)}秒</td><td>${d.worst}(${d.worstDeg ?? "—"}°)</td></tr>`).join("")}
+      </tbody></table></div></div>` : ""}
+  </div>`;
+}
+function drawJointBars(cv, joints) {
+  if (!cv) return;
+  const W = Math.max(cv.parentElement.clientWidth || 320, 280), H = 260, c = hiDPI(cv, W, H);
+  const padL = 70, padR = 40, pw = W - padL - padR, maxD = Math.max(45, ...joints.filter(v => v != null)), rowH = (H - 22) / 8;
+  c.font = `11px ${css("--f-mono")}`; c.strokeStyle = css("--line"); c.fillStyle = css("--muted"); c.textAlign = "center";
+  [0, 15, 30, 45].forEach(v => { if (v > maxD) return; const x = padL + pw * v / maxD; c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H - 18); c.stroke(); c.fillText(v + "°", x, H - 4); });
+  joints.forEach((v, q) => {
+    const y = q * rowH + 3, bh = rowH - 8;
+    c.textAlign = "right"; c.font = `700 12px ${css("--f-body")}`; c.fillStyle = css("--ink"); c.fillText(JOINTS[q], padL - 8, y + bh / 2 + 4);
+    if (v == null) return;
+    c.fillStyle = v <= 15 ? css("--good") : v <= 30 ? css("--warn") : css("--bad");
+    c.beginPath(); c.roundRect ? c.roundRect(padL, y, pw * v / maxD, bh, 3) : c.rect(padL, y, pw * v / maxD, bh); c.fill();
+    c.fillStyle = css("--muted"); c.textAlign = "left"; c.font = `600 11px ${css("--f-mono")}`; c.fillText(v + "°", padL + pw * v / maxD + 4, y + bh / 2 + 4);
+  });
+}
+function drawLag(cv, lag) {
+  if (!cv || !lag.length) return;
+  const W = Math.max(cv.parentElement.clientWidth || 320, 300), H = 170, c = hiDPI(cv, W, H);
+  const padL = 44, padB = 20, padT = 10, pw = W - padL - 8, ph = H - padB - padT;
+  const t0 = lag[0][0], t1 = lag[lag.length - 1][0] || t0 + 1, lim = Math.max(0.5, ...lag.map(x => Math.abs(x[1]))) * 1.1;
+  const X = t => padL + (t - t0) / Math.max(0.1, t1 - t0) * pw, Y = v => padT + ph / 2 - v / lim * ph / 2;
+  c.font = `11px ${css("--f-mono")}`; c.strokeStyle = css("--line"); c.fillStyle = css("--muted"); c.textAlign = "right";
+  [-lim / 1.1, 0, lim / 1.1].forEach(v => { c.beginPath(); c.moveTo(padL, Y(v)); c.lineTo(W - 8, Y(v)); c.stroke(); c.fillText((v > 0 ? "+" : "") + v.toFixed(1) + "s", padL - 4, Y(v) + 4); });
+  c.textAlign = "left"; c.fillText("遅れ", padL + 4, padT + 10); c.fillText("早い", padL + 4, padT + ph - 2);
+  c.beginPath(); lag.forEach(([t, v], i) => i ? c.lineTo(X(t), Y(v)) : c.moveTo(X(t), Y(v)));
+  c.strokeStyle = css("--beat"); c.lineWidth = 2; c.stroke();
+  c.fillStyle = css("--muted"); c.textAlign = "center";
+  const tick = (t1 - t0) > 60 ? 20 : 10;
+  for (let s = Math.ceil(t0 / tick) * tick; s <= t1; s += tick) c.fillText(s + "s", X(s), H - 4);
+}
+function wireCompare(host, rec, id) {
+  const cmp = rec.compare;
+  if (cmp && !cmp.error) {
+    drawRadar(host.querySelector("canvas.cmpradar"), [{ s: cmp.refScores, color: css("--beat"), dash: true }, { s: rec.scores, color: css("--accent") }]);
+    drawJointBars(host.querySelector("canvas.jointbars"), cmp.joints);
+    drawLag(host.querySelector("canvas.lagchart"), cmp.lag);
+  }
+  host.querySelectorAll("[data-seek]").forEach(b => b.addEventListener("click", () => { vid.pause(); vid.currentTime = +b.dataset.seek; $("#stage").scrollIntoView({ behavior: "smooth" }); }));
+  host.querySelector("[data-refsel]")?.addEventListener("change", async e => {
+    const ref = records.find(r => r.id === e.target.value); if (!ref) return;
+    rec.compare = compareWith(rec, ref); rec.refId = ref.id;
+    const box = host.querySelector("[data-cmpbox]"); box.innerHTML = compareHTML(rec, host.id === "historyDetail"); wireCompare(host, rec, id);
+    const docId = id || rec._id;
+    if (db && docId && !String(docId).startsWith("local-") && canWrite && !rec.compare.error) { try { await db.collection("analyses").doc(docId).update({ compare: rec.compare, refId: ref.id }); } catch {} }
+  });
+}
+/* vertical bars: total score per record, latest emphasised */
+function drawRecordBars(cv, list) {
+  if (!cv) return;
+  const W = Math.max(cv.parentElement.clientWidth || 360, 300), H = 300;
+  const c = hiDPI(cv, W, H), padL = 30, padB = 34, padT = 18, pw = W - padL - 8, ph = H - padB - padT;
+  const Y = v => padT + ph - v / 100 * ph;
+  c.font = `11px ${css("--f-mono")}`; c.strokeStyle = css("--line"); c.fillStyle = css("--muted"); c.textAlign = "right";
+  [0, 50, 100].forEach(v => { c.beginPath(); c.moveTo(padL, Y(v)); c.lineTo(W - 8, Y(v)); c.stroke(); c.fillText(v, padL - 6, Y(v) + 4); });
+  if (!list.length) return;
+  const slot = pw / list.length, bw = Math.min(36, slot * 0.66);
+  list.forEach((r, i) => {
+    const v = r.scores.total ?? 0, x = padL + slot * i + (slot - bw) / 2, last = i === list.length - 1;
+    c.fillStyle = last ? css("--accent") : css("--surface2"); c.strokeStyle = css("--accent"); c.lineWidth = 1;
+    c.beginPath(); c.roundRect ? c.roundRect(x, Y(v), bw, Y(0) - Y(v), [4, 4, 0, 0]) : c.rect(x, Y(v), bw, Y(0) - Y(v)); c.fill(); if (!last) c.stroke();
+    c.textAlign = "center"; c.fillStyle = css("--ink"); if (list.length <= 14 || last) c.fillText(v, x + bw / 2, Y(v) - 5);
+    const every = Math.ceil(list.length / Math.max(1, Math.floor(pw / 52)));
+    if (i % every === 0 || last) { c.fillStyle = css("--muted"); c.fillText(fmtDate(r.date).slice(5), x + bw / 2, H - padB + 16); }
+  });
+}
+function eightsHTML(rec) {
+  const g = rec.grid, off = rec.gridOffset || 0, rows = [];
+  const cells = []; for (let i = 0; i < off; i++) cells.push(null); g.forEach(x => cells.push(x));
+  for (let i = 0; i < cells.length; i += 8) rows.push(cells.slice(i, i + 8));
+  return `<div class="panel"><div class="eights"><div class="eighthead"><span></span>${[1,2,3,4,5,6,7,8].map(c => `<span>${c}</span>`).join("")}</div>
+    ${rows.map((r, ri) => `<div class="eight"><span class="lab">${ri + 1}×8</span>${Array.from({ length: 8 }, (_, j) => { const c = r[j]; if (!c) return `<div class="cell" style="background:var(--surface2)"></div>`; return `<div class="cell ${c.h ? "hit" : ""}" style="background:color-mix(in srgb, var(--accent) ${Math.round(8 + c.e * 80)}%, var(--surface2))" title="強さ ${Math.round(c.e * 100)}"></div>`; }).join("")}</div>`).join("")}
+  </div></div>`;
+}
+function drawEnergy(cv, rec) {
+  if (!cv) return;
+  const box = cv.parentElement, W = Math.max(box.clientWidth - 24, rec.energy.length * 3, 300), H = 200, dpr = window.devicePixelRatio || 1;
+  cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + "px"; cv.style.height = H + "px";
+  const c = cv.getContext("2d"); c.scale(dpr, dpr);
+  const padL = 34, padB = 22, padT = 10, pw = W - padL - 8, ph = H - padB - padT;
+  const t0 = rec.start, dur = Math.max(rec.duration, 0.1);
+  const max = Math.max(...rec.energy, 0.1) * 1.1;
+  const X = t => padL + (t - t0) / dur * pw, Y = v => padT + ph - v / max * ph;
+  c.font = `11px ${css("--f-mono")}`; c.fillStyle = css("--muted"); c.strokeStyle = css("--line"); c.lineWidth = 1;
+  [0, .5, 1].forEach(f => { const y = Y(max * f / 1.1); c.beginPath(); c.moveTo(padL, y); c.lineTo(W - 8, y); c.stroke(); });
+  // beats
+  if (rec.bpm && rec.grid) {
+    const ibi = 60 / rec.bpm, first = rec.beatsFirst ?? null;
+    const n = rec.grid.length; const off = rec.gridOffset || 0;
+    // reconstruct beat times from bpm across window
+    const beats = rec.beatTimes || [];
+    beats.forEach((b, i) => { c.strokeStyle = css("--beat"); c.globalAlpha = (i - off) % 8 === 0 ? .55 : .14; c.lineWidth = (i - off) % 8 === 0 ? 1.6 : 1; c.beginPath(); c.moveTo(X(b), padT); c.lineTo(X(b), padT + ph); c.stroke(); });
+    c.globalAlpha = 1;
+  }
+  // area
+  const step = rec.energyStep;
+  c.beginPath(); c.moveTo(X(t0), Y(0));
+  rec.energy.forEach((v, i) => c.lineTo(X(t0 + i * step), Y(v)));
+  c.lineTo(X(t0 + (rec.energy.length - 1) * step), Y(0)); c.closePath();
+  c.fillStyle = css("--accent"); c.globalAlpha = .18; c.fill(); c.globalAlpha = 1;
+  c.beginPath(); rec.energy.forEach((v, i) => { const x = X(t0 + i * step), y = Y(v); i ? c.lineTo(x, y) : c.moveTo(x, y); });
+  c.strokeStyle = css("--accent"); c.lineWidth = 2; c.shadowColor = css("--accent"); c.shadowBlur = 10; c.stroke(); c.shadowBlur = 0;
+  // hits
+  const ibi = rec.bpm ? 60 / rec.bpm : null, w = Math.max(0.1, 0.6 / rec.fps), beats = rec.beatTimes || [];
+  rec.hits.forEach(t => {
+    const on = beats.some(b => Math.abs(b - t) <= w);
+    c.fillStyle = on ? css("--beat") : css("--muted");
+    c.beginPath(); c.arc(X(t), padT + ph + 1, 3.5, 0, 7); c.fill();
+  });
+  // x labels
+  c.fillStyle = css("--muted"); c.textAlign = "center";
+  const tick = dur > 120 ? 30 : dur > 40 ? 10 : 5;
+  for (let s = Math.ceil(t0 / tick) * tick; s <= t0 + dur; s += tick) c.fillText(s + "s", X(s), H - 5);
+  c.textAlign = "right"; c.fillText("強", padL - 6, padT + 10); c.fillText("弱", padL - 6, padT + ph);
+}
+
+/* beat times are needed for drawing; store compactly */
+const _build = buildRecord;
+buildRecord = function (m, o) { const r = _build(m, o); r.beatTimes = o.audio ? o.audio.beats.filter(b => b >= o.t0 - 0.01 && b <= o.t1 + 0.01).map(r3) : []; return r; };
+
+/* ---------- save / db ---------- */
+$("#saveBtn").addEventListener("click", async () => {
+  if (!current) return;
+  $("#saveBtn").disabled = true; $("#saveNote").textContent = "保存中…";
+  current.isRef = $("#fIsRef").checked;
+  try {
+    if (db) {
+      const ref = db.collection("analyses").doc();
+      await ref.set(current); current._id = ref.id;
+    } else {
+      current._id = "local-" + Date.now(); records.unshift({ ...current, id: current._id }); renderAll();
+    }
+    $("#saveNote").textContent = db ? "保存しました。「記録」「推移」から見られます。" : "この画面を開いている間だけ保存しました。";
+    $("#scoreKicker").textContent = "解析結果(保存済み)";
+  } catch (e) {
+    $("#saveBtn").disabled = false;
+    $("#saveNote").textContent = e?.code === "quota_exceeded" ? "保存容量がいっぱいです。古い記録を削除してください。" : "保存できませんでした:" + (e.message || e.code || e);
+  }
+});
+
+async function confirmDelete(id, host) {
+  const btn = host.querySelector("[data-del]");
+  if (btn.dataset.armed !== "1") { btn.dataset.armed = "1"; btn.textContent = "もう一度押すと削除"; btn.style.color = "var(--bad)"; return; }
+  try { if (db && !id.startsWith("local-")) await db.collection("analyses").doc(id).delete(); else { records = records.filter(r => r.id !== id); renderAll(); } host.classList.add("hidden"); host.innerHTML = ""; }
+  catch (e) { btn.textContent = "削除できませんでした"; }
+}
+$("#clearSamples").addEventListener("click", async e => {
+  const b = e.currentTarget;
+  if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "もう一度押すとサンプルを削除"; return; }
+  b.disabled = true;
+  for (const r of records.filter(r => r.sample)) { try { await db.collection("analyses").doc(r.id).delete(); } catch {} }
+  b.dataset.armed = ""; b.textContent = "サンプルを消す"; b.disabled = false;
+});
+
+/* ---------- AI coach ---------- */
+async function runCoach(rec, id, btn) {
+  const host = btn.closest(".panel"), out = host.querySelector("[data-coachtext]"), note = host.querySelector("[data-coachnote]");
+  const sample = window.claude?.use ? await window.claude.use("sample").catch(() => null) : null;
+  if (!sample) { note.textContent = "この画面ではAIコーチを使えません。上の要約を参考にしてください。"; return; }
+  btn.disabled = true; note.textContent = "考え中…";
+  const payload = { タイトル: rec.title, ダンサー: rec.dancer, 曲: rec.song, BPM: rec.bpm, 人数: rec.people, 秒数: rec.duration,
+    スコア: Object.fromEntries(METRICS.map(m => [m.name, rec.scores[m.key]])), 総合: rec.scores.total,
+    ダンサー別: rec.dancers, 決めの回数: rec.hits.length, 拍に乗った決め: rec.onBeat };
+  const prompt = `あなたはダンス講師です。姿勢推定(YOLO-Pose)で算出した練習動画の数値を読み、日本語でコメントしてください。
+指標の意味: 動きの大きさ=関節の速さ、メリハリ=速い動きと止めの差、音ハメ=止め・決めが拍に乗った割合、可動域=手足の届く範囲、左右バランス=左右の動き量の差、揃い=複数人の関節角度の一致度。いずれも0〜100。nullは未計測。
+出力形式(見出しは【】、各2〜3行、合計350字以内、です・ます調、数値に触れる):
+【良い点】
+【伸ばす点】
+【次の練習メニュー】(具体的なドリルを2つ)
+データ: ${JSON.stringify(payload)}`;
+  try {
+    const res = await sample(prompt, { onText: ({ text }) => { out.textContent = text; }, modelTier: "default" });
+    out.textContent = res.text; rec.coach = res.text; note.textContent = "";
+    if (db && id && !id.startsWith("local-") && canWrite) { await db.collection("analyses").doc(id).update({ coach: res.text }); note.textContent = "記録に保存しました"; }
+    else if (rec === current && current._id && db) { await db.collection("analyses").doc(current._id).update({ coach: res.text }); note.textContent = "記録に保存しました"; }
+  } catch (e) { note.textContent = e?.code === "rate_limited" ? "少し時間をおいてから試してください。" : "コメントを作れませんでした。"; }
+  btn.disabled = false; btn.textContent = "コメントを作り直す";
+}
+
+/* ---------- history ---------- */
+function dancers() { return [...new Set(records.map(r => r.dancer))].sort(); }
+function renderAll() {
+  const ds = dancers();
+  $("#dancerList").innerHTML = ds.map(d => `<option value="${esc(d)}">`).join("");
+  const hf = $("#hFilter"), cur = hf.value;
+  hf.innerHTML = `<option value="">すべて</option>` + ds.map(d => `<option ${d === cur ? "selected" : ""}>${esc(d)}</option>`).join("");
+  const td = $("#tDancer"), tcur = td.value;
+  td.innerHTML = ds.map(d => `<option ${d === tcur ? "selected" : ""}>${esc(d)}</option>`).join("");
+  const fr = $("#fRef"), fcur = fr.value, refs = records.filter(r => r.isRef);
+  fr.innerHTML = `<option value="">比較しない</option>` + refs.map(r => `<option value="${esc(r.id)}" ${r.id === fcur ? "selected" : ""}>${esc(r.title)}(${esc(r.dancer)}・${fmtDate(r.date)})</option>`).join("");
+  $("#clearSamples").classList.toggle("hidden", !(db && canWrite && records.some(r => r.sample)));
+  if (!$("#view-history").classList.contains("hidden")) renderHistory();
+  if (!$("#view-trend").classList.contains("hidden")) renderTrend();
+}
+function renderHistory() {
+  const f = $("#hFilter").value, sort = $("#hSort").value;
+  let list = records.filter(r => !f || r.dancer === f);
+  list = list.sort((a, b) => sort === "score" ? (b.scores.total ?? -1) - (a.scores.total ?? -1) : (b.date + b.createdAt).localeCompare(a.date + a.createdAt));
+  const el = $("#hList");
+  if (!dbReady && !records.length) { el.innerHTML = `<div class="empty">記録を読み込んでいます…</div>`; return; }
+  if (!list.length) { el.innerHTML = `<div class="empty">まだ記録がありません。「解析」タブで動画を解析して「記録に保存」を押すと、ここに貯まっていきます。</div>`; return; }
+  el.innerHTML = list.map(r => `<button class="rec-row" data-id="${esc(r.id)}">
+    ${r.thumb ? `<img class="thumb" src="${r.thumb}" alt="">` : `<div class="thumb"></div>`}
+    <div style="min-width:0"><div class="ttl">${esc(r.title)}</div>
+    <div class="sub">${fmtDate(r.date)}・${esc(r.dancer)}${r.song ? "・" + esc(r.song) : ""}・${r.people}人${r.bpm ? "・BPM " + r.bpm : ""}</div>
+    <div class="chips" style="margin-top:4px">${r.sample ? `<span class="chip">サンプル</span>` : ""}${r.isRef ? `<span class="chip ref">見本</span>` : ""}${r.compare && !r.compare.error ? `<span class="chip ref">見本との一致 ${r.compare.similarity}</span>` : ""}${r.coach ? `<span class="chip acc">コーチ済</span>` : ""}</div></div>
+    <div class="sc">${r.scores.total ?? "–"}<small>総合</small></div></button>`).join("");
+  $$(".rec-row", el).forEach(b => b.addEventListener("click", () => {
+    const r = records.find(x => x.id === b.dataset.id); if (!r) return;
+    renderResult(r, { target: "history", id: r.id });
+    $("#historyDetail").scrollIntoView({ behavior: "smooth", block: "start" });
+  }));
+}
+$("#hFilter").addEventListener("change", renderHistory);
+$("#hSort").addEventListener("change", renderHistory);
+
+/* ---------- trend ---------- */
+$("#tMetric").innerHTML = `<option value="total">総合スコア</option><option value="ref">見本との一致度</option>` + METRICS.map(m => `<option value="${m.key}">${m.name}</option>`).join("");
+const valOf = (r, key) => key === "total" ? r.scores.total : key === "ref" ? (r.compare && !r.compare.error ? r.compare.similarity : null) : r.scores[key];
+$("#tDancer").addEventListener("change", renderTrend);
+$("#tMetric").addEventListener("change", renderTrend);
+window.addEventListener("resize", () => { if (!$("#view-trend").classList.contains("hidden")) renderTrend(); });
+function renderTrend() {
+  const d = $("#tDancer").value, key = $("#tMetric").value;
+  const list = records.filter(r => r.dancer === d).sort((a, b) => (a.date + a.createdAt).localeCompare(b.date + b.createdAt));
+  const cv = $("#trendCanvas"), box = cv.parentElement, W = Math.max(box.clientWidth - 24, 320), H = 300, dpr = window.devicePixelRatio || 1;
+  cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + "px"; cv.style.height = H + "px";
+  const c = cv.getContext("2d"); c.scale(dpr, dpr);
+  c.font = `11px ${css("--f-mono")}`;
+  const padL = 34, padR = 16, padT = 16, padB = 40, pw = W - padL - padR, ph = H - padT - padB;
+  const Y = v => padT + ph - v / 100 * ph;
+  c.strokeStyle = css("--line"); c.fillStyle = css("--muted"); c.textAlign = "right";
+  [0, 25, 50, 75, 100].forEach(v => { c.beginPath(); c.moveTo(padL, Y(v)); c.lineTo(W - padR, Y(v)); c.stroke(); c.fillText(v, padL - 6, Y(v) + 4); });
+  const pts = list.map(r => ({ r, v: valOf(r, key) })).filter(p => p.v != null);
+  if (!pts.length) { c.textAlign = "center"; c.fillText(records.length ? "この指標の記録はまだありません" : "記録を保存すると、ここに伸びが描かれます", W / 2, H / 2); $("#trendTable").innerHTML = ""; return; }
+  const X = i => padL + (pts.length === 1 ? pw / 2 : i / (pts.length - 1) * pw);
+  c.fillStyle = css("--accent"); c.globalAlpha = .12;
+  c.beginPath(); c.moveTo(X(0), Y(0)); pts.forEach((p, i) => c.lineTo(X(i), Y(p.v))); c.lineTo(X(pts.length - 1), Y(0)); c.closePath(); c.fill(); c.globalAlpha = 1;
+  c.strokeStyle = css("--accent"); c.lineWidth = 2.2; c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(X(i), Y(p.v)) : c.moveTo(X(i), Y(p.v))); c.stroke();
+  pts.forEach((p, i) => {
+    const last = i === pts.length - 1;
+    c.fillStyle = css("--surface"); c.strokeStyle = css("--accent"); c.lineWidth = 2;
+    c.beginPath(); c.arc(X(i), Y(p.v), last ? 6 : 4, 0, 7); c.fill(); c.stroke();
+    if (last || pts.length <= 12) { c.fillStyle = css("--ink"); c.textAlign = "center"; c.fillText(p.v, X(i), Y(p.v) - 10); }
+    const every = Math.ceil(pts.length / Math.max(1, Math.floor(pw / 70)));
+    if (i % every === 0 || last) { c.fillStyle = css("--muted"); c.fillText(fmtDate(p.r.date).slice(5), X(i), H - padB + 18); }
+  });
+  const first = list[0], latest = list[list.length - 1];
+  drawRadar($("#trendRadar"), list.length > 1 ? [{ s: first.scores, color: css("--beat"), dash: true }, { s: latest.scores, color: css("--accent") }] : [{ s: latest.scores, color: css("--accent") }]);
+  drawRecordBars($("#trendBars"), list.slice(-20));
+  const rows = [{ key: "total", name: "総合スコア" }, { key: "ref", name: "見本との一致度" }, ...METRICS];
+  $("#trendTable").innerHTML = `<thead><tr><th>指標</th><th>初回 ${fmtDate(first.date)}</th><th>最新 ${fmtDate(latest.date)}</th><th>変化</th></tr></thead><tbody>` +
+    rows.map(m => { const a = valOf(first, m.key), b = valOf(latest, m.key);
+      const diff = a != null && b != null ? b - a : null;
+      return `<tr><td>${m.name}</td><td class="n">${a ?? "—"}</td><td class="n">${b ?? "—"}</td><td class="n" style="color:${diff == null ? "var(--muted)" : diff > 0 ? "var(--good)" : diff < 0 ? "var(--bad)" : "var(--muted)"}">${diff == null ? "—" : (diff > 0 ? "+" : "") + diff}</td></tr>`; }).join("") + "</tbody>";
+}
+
+/* ---------- boot: db ---------- */
+(async () => {
+  renderHistory();
+  const cl = window.claude;
+  if (!cl?.use) { dbReady = true; $("#dbBanner").textContent = "この画面では記録を長期保存できません。解析結果は開いている間だけ残ります。"; $("#dbBanner").classList.remove("hidden"); renderAll(); return; }
+  [db, user] = await Promise.all([cl.use("db").catch(() => null), cl.use("user").catch(() => null)]);
+  if (user) { try { const w = await user.can("data.write"); if (w === false) canWrite = false; } catch {} }
+  if (!db) { dbReady = true; $("#dbBanner").textContent = "サインインしていないため、記録は開いている間だけ残ります。"; $("#dbBanner").classList.remove("hidden"); renderAll(); return; }
+  db.collection("analyses").orderBy("createdAt", "desc").limit(500).onSnapshot(snap => {
+    dbReady = true;
+    records = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    renderAll();
+  }, err => { dbReady = true; $("#dbBanner").textContent = "記録を読み込めませんでした。ページを開き直してください。"; $("#dbBanner").classList.remove("hidden"); renderAll(); });
+})();
+})();
+</script>
