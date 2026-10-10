@@ -652,25 +652,113 @@ async function checkAudio(file) {
     el.textContent = `音声:あり(${audio.numberOfChannels}ch・${audio.duration.toFixed(0)}秒)。テンポと音ハメを計測できます。`;
   } catch (e) {
     if (videoFile !== file) return;
-    const i = AUDIO_INFO.decode_failed;
-    el.textContent = `音声:検出できず。${i.why} このまま解析すると「音ハメ」は未計測になります。対処:${i.fix}`;
+    el.textContent = `音声:まるごと解読はできませんでした(${e?.name || ""} ${e?.message || e}・${Math.round(file.size / 1048576)}MB ${file.type || ""})。解析時は動画を倍速再生しながら音を録る方式を自動で試します。`;
   }
 }
-async function analyzeAudio(file, t0, t1) {
-  audioStatus = null;
+let audioDetail = "", audioMethod = "";   // 失敗の中身(画面に出す)/ 取れた方法 decode | playback
+/* 方法1:ファイルをまるごと解読(速い。大きな動画や一部の形式で失敗する) */
+async function monoByDecode(file, t0, t1) {
+  const buf = await file.arrayBuffer();
+  const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const audio = await new AC(1, 44100, 44100).decodeAudioData(buf);
+  const sr = audio.sampleRate, ch = audio.numberOfChannels;
+  const a = Math.floor(t0 * sr), b = Math.min(audio.length, Math.floor(t1 * sr));
+  if (b - a < sr * 4) return { short: true };
+  const mono = new Float32Array(b - a);
+  for (let c = 0; c < ch; c++) { const d = audio.getChannelData(c); for (let i = a; i < b; i++) mono[i - a] += d[i] / ch; }
+  return { mono, sr };
+}
+/* 方法2:動画を倍速で再生しながら音だけ録る(解読に失敗したときの保険。60秒の範囲なら15〜30秒かかる)
+   再生経路には端末ごとに違う遅延があるので、同じ経路でクリック音を鳴らして遅延を実測し、その分を補正する */
+let acLive = null, sinkLive = null; const srcLive = new Map(), latencyByRate = new Map();
+function liveCtx() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!acLive) { acLive = new AC(); sinkLive = acLive.createGain(); sinkLive.gain.value = 0; sinkLive.connect(acLive.destination); }   // 録るだけで鳴らさない
+  return acLive;
+}
+function sourceFor(el) { if (!srcLive.has(el)) srcLive.set(el, liveCtx().createMediaElementSource(el)); return srcLive.get(el); }   // 1要素につき1回しか作れない
+const captureRate = () => /Chrome\//.test(navigator.userAgent) && !/Edg|OPR/.test(navigator.userAgent) ? 4 : 2;
+async function captureElement(el, t0, t1, rate, onProgress) {
+  const ac = liveCtx(); if (ac.state === "suspended") await ac.resume();
+  const sr = ac.sampleRate, src = sourceFor(el);
+  const proc = ac.createScriptProcessor(4096, 1, 1), chunks = [];
+  let total = 0, started = false, firstPT = null; const pairs = [];   // pairs: [コンテキスト時刻, 要素の時刻] を再生中に記録して直線で合わせる
+  proc.onaudioprocess = e => { if (!started) return; if (firstPT == null) firstPT = e.playbackTime; const d = e.inputBuffer.getChannelData(0); chunks.push(new Float32Array(d)); total += d.length; };
+  src.connect(proc); proc.connect(sinkLive);
+  const prevMuted = el.muted, prevRate = el.playbackRate, prevPitch = el.preservesPitch;
   try {
-    const buf = await file.arrayBuffer();
-    const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-    const ac = new AC(1, 44100, 44100);
-    const audio = await ac.decodeAudioData(buf);
-    const sr = audio.sampleRate, ch = audio.numberOfChannels;
-    const a = Math.floor(t0 * sr), b = Math.min(audio.length, Math.floor(t1 * sr));
-    if (b - a < sr * 4) { audioStatus = "too_short"; return null; }
-    const mono = new Float32Array(b - a);
-    for (let c = 0; c < ch; c++) { const d = audio.getChannelData(c); for (let i = a; i < b; i++) mono[i - a] += d[i] / ch; }
-    const hop = 512, fr = sr / hop, n = Math.floor(mono.length / hop) - 1;
+    el.muted = false; el.volume = 1; el.preservesPitch = false; el.playbackRate = rate;
+    await new Promise(res => { const h = () => { el.removeEventListener("seeked", h); res(); }; el.addEventListener("seeked", h); el.currentTime = t0; });
+    await el.play();
+    started = true;
+    await new Promise((res, rej) => {
+      const tick = () => {
+        pairs.push([ac.currentTime, el.currentTime]);
+        if (el.currentTime >= t1 - 0.05 || el.ended) { res(); return; }
+        if (el.paused && started) { rej(new Error("再生が止まりました")); return; }
+        onProgress?.((el.currentTime - t0) / (t1 - t0));
+        setTimeout(tick, 100);
+      };
+      tick();
+    });
+  } finally {
+    el.pause(); started = false;
+    proc.disconnect(); src.disconnect(proc);
+    el.muted = prevMuted; el.playbackRate = prevRate; el.preservesPitch = prevPitch;
+  }
+  const mono = new Float32Array(total); let o = 0; for (const c of chunks) { mono.set(c, o); o += c.length; }
+  // 倍速で録ったので、元の時間軸では「サンプルレートが 1/rate」の音声として扱う。
+  // 開始時刻:(コンテキスト時刻, 要素の時刻)の直線回帰で、最初のチャンクの時刻を要素の時刻に変換
+  const fit = pairs.filter(([, m]) => m > t0 + 0.02);
+  const mx = mean(fit.map(p => p[0])), my = mean(fit.map(p => p[1]));
+  let sxy = 0, sxx = 0; fit.forEach(([x, y]) => { sxy += (x - mx) * (y - my); sxx += (x - mx) ** 2; });
+  const slope = sxx > 0 ? sxy / sxx : rate;
+  const first = firstPT ?? ac.currentTime;
+  return { mono, sr: sr / rate, t0: fit.length >= 3 ? my + slope * (first - mx) : t0, samples: total };
+}
+/* 校正:0.5秒の位置にクリックが1つ入った1.5秒の音を鳴らして録り、どれだけズレて録れたかを測る */
+function clickWav() {
+  const sr = 44100, n = Math.round(sr * 1.5), buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const str = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  str(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); str(8, "WAVE"); str(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, "data"); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) { const t = i / sr, ph = t - 0.5; const a = ph >= 0 && ph < 0.02 ? 0.9 * Math.sin(2 * Math.PI * 1000 * t) * (1 - ph / 0.02) : 0; v.setInt16(44 + i * 2, a * 32767, true); }
+  return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+}
+let calEl = null;
+async function playbackLatency(rate) {
+  if (latencyByRate.has(rate)) return latencyByRate.get(rate);
+  if (!calEl) { calEl = document.createElement("audio"); calEl.src = clickWav(); calEl.preload = "auto"; calEl.setAttribute("playsinline", ""); document.body.appendChild(calEl); await new Promise(r => { if (calEl.readyState >= 1) r(); else calEl.onloadedmetadata = r; }); }
+  const got = await captureElement(calEl, 0, 1.45, rate);
+  let idx = -1; for (let i = 0; i < got.mono.length; i++) if (Math.abs(got.mono[i]) > 0.25) { idx = i; break; }
+  const lat = idx < 0 ? 0 : (got.t0 + idx / got.sr) - 0.5;   // 録れた音の中でクリックが「何秒の位置」に見えたか − 本当の位置
+  if (idx >= 0 && Math.abs(lat) < 1) latencyByRate.set(rate, lat);
+  return idx >= 0 ? lat : 0;
+}
+async function monoByPlayback(t0, t1, onProgress) {
+  const rate = captureRate();
+  const lat = await playbackLatency(rate);
+  const got = await captureElement(vid, t0, t1, rate, onProgress);
+  if (got.samples < got.sr * 4) return { short: true };
+  audioDetail += `(再生遅延 ${Math.round(lat * 1000)}ms を補正)`;
+  return { mono: got.mono, sr: got.sr, t0: got.t0 - lat };
+}
+async function analyzeAudio(file, t0, t1, onProgress) {
+  audioStatus = null; audioDetail = ""; audioMethod = "";
+  let got = null;
+  try { got = await monoByDecode(file, t0, t1); audioMethod = "decode"; }
+  catch (e) {
+    console.warn("audio decode", e);
+    audioDetail = `解読エラー: ${e?.name || ""} ${e?.message || e}`.trim();
+    try { got = await monoByPlayback(t0, t1, onProgress); audioMethod = "playback"; audioDetail += " → 再生しながら録音する方式に切り替えました"; }
+    catch (e2) { console.warn("audio playback", e2); audioDetail += ` / 録音も失敗: ${e2?.message || e2}`; audioStatus = "decode_failed"; return null; }
+  }
+  if (got.short) { audioStatus = "too_short"; return null; }
+  try {
+    const { mono, sr } = got, base = got.t0 ?? t0;
+    const hop = Math.max(64, Math.round(sr / 86)), fr = sr / hop, n = Math.floor(mono.length / hop) - 1;
     const le = new Float32Array(n);
-    for (let k = 0; k < n; k++) { let e = 0; for (let i = k * hop; i < k * hop + 1024 && i < mono.length; i++) { const v = i > 0 ? mono[i] - 0.97 * mono[i-1] : mono[i]; e += v * v; } le[k] = Math.log(1e-9 + e); }
+    for (let k = 0; k < n; k++) { let e = 0; for (let i = k * hop; i < k * hop + 2 * hop && i < mono.length; i++) { const v = i > 0 ? mono[i] - 0.97 * mono[i-1] : mono[i]; e += v * v; } le[k] = Math.log(1e-9 + e); }
     const on = new Float32Array(n);
     for (let k = 1; k < n; k++) on[k] = Math.max(0, le[k] - le[k - 1]);
     const W = Math.round(fr * 0.5); const ons = new Float32Array(n);
@@ -693,9 +781,9 @@ async function analyzeAudio(file, t0, t1) {
     while (bpm < 75) { bpm *= 2; period /= 2; } while (bpm > 165) { bpm /= 2; period *= 2; }
     let bestP = 0, bp = -1;
     for (let p = 0; p < period; p += 0.5) { let s = 0; for (let x = p; x < n; x += period) s += ons[Math.round(x)] || 0; if (s > bp) { bp = s; bestP = p; } }
-    const beats = []; for (let x = bestP; x < n; x += period) beats.push(t0 + x / fr);
+    const beats = []; for (let x = bestP; x < n; x += period) beats.push(base + x / fr);
     return { bpm: Math.round(bpm * 10) / 10, beats };
-  } catch (e) { console.warn("audio", e); audioStatus = "decode_failed"; return null; }
+  } catch (e) { console.warn("audio beats", e); audioDetail += ` / 拍の計算に失敗: ${e?.message || e}`; audioStatus = "decode_failed"; return null; }
 }
 
 /* ---------- run analysis ---------- */
@@ -713,7 +801,8 @@ async function runAnalysis() {
   try {
     const sess = await getSession();
     setProg(0, "音楽のテンポを測定中…");
-    const audioP = analyzeAudio(videoFile, t0, t1);
+    const audio = await analyzeAudio(videoFile, t0, t1, f => setProg(f * 0.15, `音声を録音中(倍速再生)… ${Math.round(f * 100)}%`));
+    if (audio) setProg(0.15, `テンポ ${audio.bpm} BPM。関節を検出中…`); else setProg(0.15, "音声が取れませんでした(あとで理由を表示)。関節を検出中…");
     const track = makeTracker();
     const total = Math.floor((t1 - t0) * fps);
     const tStart = performance.now();
@@ -725,11 +814,10 @@ async function runAnalysis() {
       frames.push(fr);
       drawFrame(fr);
       const el = (performance.now() - tStart) / 1000, rem = el / (i + 1) * (total - i);
-      setProg((i + 1) / (total + 1), `${t.toFixed(1)}秒 / 人数 ${dets.length} / 残り約${Math.ceil(rem)}秒`);
+      setProg(0.15 + 0.85 * (i + 1) / (total + 1), `${t.toFixed(1)}秒 / 人数 ${dets.length} / 残り約${Math.ceil(rem)}秒`);
     }
     if (frames.length < fps * 2) throw new Error("解析できたコマが少なすぎます。もう少し長い範囲を選んでください。");
     setProg(1, "スコアを計算中…");
-    const audio = await audioP;
     current = buildRecord(computeMetrics(frames, fps, audio), { fps, t0, t1: frames[frames.length - 1].t, audio });
     const ref = records.find(r => r.id === $("#fRef").value);
     if (ref) { setProg(1, "見本と比較中…"); await new Promise(r => setTimeout(r, 30)); current.compare = compareWith(current, ref); current.refId = ref.id; }
@@ -917,7 +1005,7 @@ function buildRecord(m, o) {
     people: m.people, scores: m.scores, dancers: m.dancers, energy: m.energy, energyStep: m.energyStep,
     hits: m.hits, onBeat: m.onBeat, grid: m.grid, gridOffset: m.gridOffset, thumb: makeThumb(), coach: "", sample: false,
     angles: m.angleStore, isRef: false, refId: null, compare: null,
-    why: m.why, audioStatus: o.audio ? null : (audioStatus || "unknown"),
+    why: m.why, audioStatus: o.audio ? null : (audioStatus || "unknown"), audioDetail: audioDetail || "", audioMethod: o.audio ? audioMethod : "",
   };
 }
 
@@ -936,7 +1024,7 @@ function renderResult(rec, { target, fresh, id }) {
     $("#scoreChips").innerHTML = (rec.bpm ? `<span class="chip beat">BPM ${rec.bpm}</span>` : `<span class="chip">音声なし</span>`) + `<span class="chip acc">${rec.fps}コマ/秒</span>`;
     $("#metrics").innerHTML = metricRows(rec.scores);
     const sn = $("#scoreNote"); sn.classList.toggle("hidden", !!rec.bpm);
-    if (!rec.bpm) { const i = audioInfo(rec.audioStatus); sn.textContent = `音ハメが未計測です。${i.why} 対処:${i.fix}`; }
+    if (!rec.bpm) { const i = audioInfo(rec.audioStatus); sn.textContent = `音ハメが未計測です。${i.why} 対処:${i.fix}${rec.audioDetail ? `(詳細: ${rec.audioDetail}・ファイル ${videoFile ? Math.round(videoFile.size / 1048576) + "MB " + (videoFile.type || "") : ""})` : ""}`; }
     $("#saveRow").classList.toggle("hidden", !fresh);
     $("#saveBtn").disabled = !canWrite; $("#saveNote").textContent = canWrite ? "" : "閲覧のみの権限のため保存できません";
   }
