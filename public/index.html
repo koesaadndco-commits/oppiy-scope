@@ -977,6 +977,7 @@ function computeMetrics(frames, fps, audio) {
   // energy downsample to 4/sec
   const bin = Math.max(1, Math.round(fps / 4)), energy = [];
   for (let i = 0; i < n; i += bin) energy.push(r3(mean(Es.slice(i, i + bin)) || 0));
+  const dancerEnergy = per.slice(0, 8).map(p => { const o = []; for (let i = 0; i < n; i += bin) o.push(r3(mean(p.sp.slice(i, i + bin)) || 0)); return o; });
   // joint-angle series for comparison with a reference (unsigned 0-180°, ~4 frames/sec, -1 = not visible)
   const keepD = per.slice(0, 6);
   let step = Math.max(1, Math.round(fps / 4));
@@ -988,7 +989,7 @@ function computeMetrics(frames, fps, audio) {
     mean: pack((j, i) => mean(per.map(p => Math.abs(p.angles[j][i])))),
     energy: (() => { const o = []; for (let i = 0; i < n; i += step) o.push(r3(Es[i] || 0)); return o; })(),
   };
-  return { scores, dancers, energy, energyStep: bin / fps, hits: hits.map(r3), onBeat, grid, gridOffset, people: per.length, angleStore, why };
+  return { scores, dancers, energy, dancerEnergy, energyStep: bin / fps, hits: hits.map(r3), onBeat, grid, gridOffset, people: per.length, angleStore, why };
 }
 
 function makeThumb() {
@@ -1005,7 +1006,7 @@ function buildRecord(m, o) {
     people: m.people, scores: m.scores, dancers: m.dancers, energy: m.energy, energyStep: m.energyStep,
     hits: m.hits, onBeat: m.onBeat, grid: m.grid, gridOffset: m.gridOffset, thumb: makeThumb(), coach: "", sample: false,
     angles: m.angleStore, isRef: false, refId: null, compare: null,
-    why: m.why, audioStatus: o.audio ? null : (audioStatus || "unknown"), audioDetail: audioDetail || "", audioMethod: o.audio ? audioMethod : "",
+    dancerEnergy: m.dancerEnergy, why: m.why, audioStatus: o.audio ? null : (audioStatus || "unknown"), audioDetail: audioDetail || "", audioMethod: o.audio ? audioMethod : "",
   };
 }
 
@@ -1039,6 +1040,9 @@ function renderResult(rec, { target, fresh, id }) {
     { s: rec.scores, color: css("--accent") },
   ]);
   drawDancerBars(host.querySelector("canvas.dbars"), rec);
+  drawBeatOffsets(host.querySelector("canvas.beatoff"), rec);
+  drawSpeedHist(host.querySelector("canvas.speedhist"), rec);
+  drawDancerEnergy(host.querySelector("canvas.dancerenergy"), rec);
   wireCompare(host, rec, id);
   host.querySelector("[data-csv]")?.addEventListener("click", () => downloadText(csvName([rec]), toCSV([rec])));
   host.querySelector("[data-print]")?.addEventListener("click", () => printRecord(host, rec));
@@ -1108,12 +1112,26 @@ function detailHTML(rec, standalone, id) {
         <div class="legend">${rec.dancers.map((d, i) => `<span><i style="background:${DANCER_COLORS[i % 8]}"></i>${d.label}</span>`).join("")}</div>
       </div>
     </div>`;
+  const extra = `
+    <div class="sec charts2">
+      <div class="panel"><h3>拍の合わせ方(決めが拍の前後どこに入ったか)</h3>
+        <div class="chartbox" style="border:0;padding:0"><canvas class="beatoff" height="220"></canvas></div>
+        <div class="legend"><span><i style="background:var(--beat)"></i>拍に乗った</span><span><i style="background:var(--muted)"></i>ずれた</span><span><i style="background:var(--beat-soft)"></i>判定の窓</span></div>
+      </div>
+      <div class="panel"><h3>動きの強さの分布(メリハリの根拠)</h3>
+        <div class="chartbox" style="border:0;padding:0"><canvas class="speedhist" height="200"></canvas></div>
+        <div class="legend"><span class="note">右に長く伸びているほど「速い瞬間」が多い。2本の線が離れているほどメリハリが強い</span></div>
+      </div>
+    </div>
+    ${rec.dancers.length > 1 ? `<div class="sec"><h2>ダンサー別の動きの流れ</h2><p class="lead">誰がどの場面で動き、誰が止まっていたか。線が重なっているほど揃っています。</p>
+      <div class="chartbox"><canvas class="dancerenergy" height="200"></canvas></div>
+      <div class="legend">${rec.dancers.map((d, i) => `<span><i style="background:${DANCER_COLORS[i % 8]}"></i>${d.label}</span>`).join("")}</div></div>` : ""}`;
   return `${head}${printhead}${exportRow}${whyHTML(rec)}${charts}
     <div class="sec"><h2>動きの強さの流れ</h2><p class="lead">全員の関節の速さの平均。縦の線は拍(太い線が8カウントの「1」)、青い点は動きを止めた「決め」の瞬間です。</p>
     <div class="chartbox"><canvas class="energy" height="200"></canvas></div>
     <div class="legend"><span><i style="background:var(--accent)"></i>動きの強さ</span><span><i style="background:var(--beat)"></i>決め(拍に乗った)</span><span><i style="background:var(--muted)"></i>決め(拍からずれた)</span></div></div>
     <div class="sec"><h2>カウント表</h2><p class="lead">1エイト(8カウント)ごとに、その拍での動きの強さを色の濃さで、拍に乗った決めを点で表示。${rec.bpm ? `テンポ ${rec.bpm} BPM、決め ${rec.hits.length}回のうち ${rec.onBeat}回が拍の上。` : ""}</p>${grid}</div>
-    ${dancersT}<div data-cmpbox>${compareHTML(rec, standalone)}</div>${coach}`;
+    ${extra}${dancersT}<div data-cmpbox>${compareHTML(rec, standalone)}</div>${coach}`;
 }
 /* 各指標の根拠:計測値と換算のしかた */
 const WHY_REASONS = { no_audio: "音声が取れなかったため未計測", few_beats: "拍をはっきり取れなかったため未計測", few_hits: "決めが4回未満だったため未計測(短い範囲や止めの少ない振りで起きます)", one_person: "1人の動画のため未計測(2人以上で計測します)", unknown: "未計測" };
@@ -1463,6 +1481,86 @@ function drawEnergy(cv, rec) {
   c.textAlign = "right"; c.fillText("強", padL - 6, padT + 10); c.fillText("弱", padL - 6, padT + ph);
 }
 
+/* ---------- facts: 数値の読み解き(グラフとAIコーチで共用) ---------- */
+function beatOffsets(rec) {
+  const beats = rec.beatTimes || []; if (!rec.bpm || beats.length < 2 || !rec.hits?.length) return null;
+  const ibi = 60 / rec.bpm, w = Math.max(0.1, 0.6 / rec.fps);
+  const offs = rec.hits.map(t => { let d = Infinity; for (const b of beats) { const x = t - b; if (Math.abs(x) < Math.abs(d)) d = x; } return d; }).filter(d => Math.abs(d) <= ibi / 2);
+  if (!offs.length) return null;
+  const on = offs.filter(d => Math.abs(d) <= w).length, early = offs.filter(d => d < -w).length, late = offs.filter(d => d > w).length;
+  return { ibi, w, offs, on, early, late, meanMs: Math.round(mean(offs) * 1000), sdMs: Math.round(Math.sqrt(mean(offs.map(d => (d - mean(offs)) ** 2))) * 1000) };
+}
+function segmentFacts(rec, k = 4) {
+  const e = rec.energy || []; if (e.length < k) return [];
+  const step = rec.energyStep, t0 = rec.start, segLen = e.length / k, overall = mean(e) || 1, beats = rec.beatTimes || [], w = Math.max(0.1, 0.6 / rec.fps);
+  return Array.from({ length: k }, (_, i) => {
+    const a = Math.round(i * segLen), b = Math.round((i + 1) * segLen), ta = r3(t0 + a * step), tb = r3(t0 + b * step);
+    const hits = rec.hits.filter(t => t >= ta && t < tb), on = rec.bpm ? hits.filter(t => beats.some(x => Math.abs(x - t) <= w)).length : null;
+    return { from: ta, to: tb, energyPct: Math.round(100 * (mean(e.slice(a, b)) || 0) / overall), hits: hits.length, onBeat: on };
+  });
+}
+function coachFacts(rec) {
+  const bo = beatOffsets(rec), segs = segmentFacts(rec), prev = previousOf(rec);
+  return {
+    計測値: rec.why ? Object.fromEntries(METRICS.map(m => [m.name, rec.why[m.key]?.measured != null ? `${rec.why[m.key].measured} ${rec.why[m.key].unit || ""}` : (rec.why[m.key]?.reason || "未計測")])) : null,
+    拍との関係: bo ? { 決め回数: bo.offs.length, 拍に乗った: bo.on, 早い: bo.early, 遅い: bo.late, 平均ズレms: bo.meanMs, ばらつきms: bo.sdMs, 判定窓ms: Math.round(bo.w * 1000) } : (rec.bpm ? "決めが少ない" : `音声なし(${audioInfo(rec.audioStatus).why})`),
+    時間帯別: segs.map(s => ({ 区間: `${s.from}〜${s.to}秒`, 動きの強さ_全体平均比: s.energyPct + "%", 決め: s.hits, 拍に乗った決め: s.onBeat })),
+    ダンサー別: rec.dancers.map((d, i) => ({ ...d, 動きの強さ_全体平均比: rec.dancerEnergy?.[i] ? Math.round(100 * (mean(rec.dancerEnergy[i]) || 0) / (mean(rec.energy) || 1)) + "%" : undefined })),
+    見本との比較: rec.compare && !rec.compare.error ? { 一致度: rec.compare.similarity, タイミング: rec.compare.timing, 部位別ズレ: rec.compare.joints, 二秒ごとの一致度: rec.compare.lag } : null,
+    前回: prev ? { 日付: prev.date, タイトル: prev.title, スコア: Object.fromEntries(METRICS.map(m => [m.name, prev.scores[m.key]])), 総合: prev.scores.total } : null,
+  };
+}
+
+/* ---------- extra charts ---------- */
+function chartBase(cv, H) {
+  if (!cv) return null;
+  const box = cv.parentElement, W = Math.max((box.clientWidth || 360) - 24, 300);
+  const c = hiDPI(cv, W, H); c.font = `11px ${css("--f-mono")}`;
+  return { c, W, H };
+}
+/* 拍ズレの分布:決めが拍の何ms前後に入ったか */
+function drawBeatOffsets(cv, rec) {
+  const base = chartBase(cv, 220); if (!base) return; const { c, W, H } = base;
+  const bo = beatOffsets(rec); if (!bo) { c.fillStyle = css("--muted"); c.textAlign = "center"; c.fillText("音声なし、または決めがありません", W / 2, H / 2); return; }
+  const half = bo.ibi / 2, bins = 16, cnt = new Array(bins).fill(0);
+  bo.offs.forEach(d => { const i = Math.min(bins - 1, Math.floor((d + half) / (2 * half) * bins)); cnt[i]++; });
+  const padL = 10, padB = 34, padT = 26, pw = W - padL - 10, ph = H - padB - padT, max = Math.max(...cnt, 1);
+  const X = d => padL + (d + half) / (2 * half) * pw, Y = v => padT + ph - v / max * ph, bw = pw / bins;
+  c.fillStyle = css("--beat-soft"); c.fillRect(X(-bo.w), padT, X(bo.w) - X(-bo.w), ph);
+  cnt.forEach((v, i) => { if (!v) return; const d = -half + (i + .5) * (2 * half) / bins; c.fillStyle = Math.abs(d) <= bo.w ? css("--beat") : css("--muted"); const x = padL + i * bw + 1, y = Y(v); c.beginPath(); c.roundRect(x, y, bw - 2, padT + ph - y, [3, 3, 0, 0]); c.fill(); if (v) { c.fillStyle = css("--ink"); c.textAlign = "center"; c.fillText(v, x + bw / 2 - 1, y - 4); } });
+  c.strokeStyle = css("--accent"); c.lineWidth = 2; c.beginPath(); c.moveTo(X(0), padT); c.lineTo(X(0), padT + ph); c.stroke();
+  c.fillStyle = css("--muted"); c.textAlign = "left"; c.fillText(`早い ← ${-Math.round(half * 1000)}ms`, padL, H - 8); c.textAlign = "right"; c.fillText(`+${Math.round(half * 1000)}ms → 遅い`, W - 10, H - 8);
+  c.textAlign = "center"; c.fillStyle = css("--ink"); c.fillText("拍の上(0ms)", X(0), H - 8);
+  c.textAlign = "left"; c.fillStyle = css("--ink"); c.font = `700 12px ${css("--f-body")}`;
+  c.fillText(`平均 ${bo.meanMs > 0 ? "+" : ""}${bo.meanMs}ms(${bo.meanMs > 30 ? "遅れ気味" : bo.meanMs < -30 ? "走り気味" : "ほぼ拍の上"})・ばらつき ±${bo.sdMs}ms・拍に乗った ${bo.on}/${bo.offs.length}`, padL, 16);
+}
+/* ダンサー別の動きの流れ */
+function drawDancerEnergy(cv, rec) {
+  const base = chartBase(cv, 200); if (!base) return; const { c, W, H } = base;
+  const de = rec.dancerEnergy; if (!de || !de.length) { c.fillStyle = css("--muted"); c.textAlign = "center"; c.fillText("この記録にはダンサー別の流れがありません(再解析で表示)", W / 2, H / 2); return; }
+  const padL = 34, padB = 22, padT = 10, pw = W - padL - 8, ph = H - padB - padT, t0 = rec.start, dur = Math.max(rec.duration, .1), step = rec.energyStep;
+  const max = Math.max(...de.flat(), .1) * 1.1, X = t => padL + (t - t0) / dur * pw, Y = v => padT + ph - v / max * ph;
+  c.strokeStyle = css("--line"); c.lineWidth = 1; [0, .5, 1].forEach(f => { const y = Y(max * f / 1.1); c.beginPath(); c.moveTo(padL, y); c.lineTo(W - 8, y); c.stroke(); });
+  de.forEach((arr, k) => { c.beginPath(); arr.forEach((v, i) => { const x = X(t0 + i * step), y = Y(v); i ? c.lineTo(x, y) : c.moveTo(x, y); }); c.strokeStyle = DANCER_COLORS[k % 8]; c.lineWidth = 2; c.stroke(); });
+  c.fillStyle = css("--muted"); c.textAlign = "center"; const tick = dur > 120 ? 30 : dur > 40 ? 10 : 5;
+  for (let s2 = Math.ceil(t0 / tick) * tick; s2 <= t0 + dur; s2 += tick) c.fillText(s2 + "s", X(s2), H - 5);
+  c.textAlign = "right"; c.fillText("強", padL - 6, padT + 10); c.fillText("弱", padL - 6, padT + ph);
+}
+/* 動きの強さの分布(メリハリの根拠):遅い瞬間と速い瞬間がどれだけ離れているか */
+function drawSpeedHist(cv, rec) {
+  const base = chartBase(cv, 200); if (!base) return; const { c, W, H } = base;
+  const e = (rec.energy || []).filter(v => v > 0); if (e.length < 8) return;
+  const max = Math.max(...e), bins = 12, cnt = new Array(bins).fill(0);
+  e.forEach(v => cnt[Math.min(bins - 1, Math.floor(v / max * bins))]++);
+  const padL = 10, padB = 34, padT = 26, pw = W - padL - 10, ph = H - padB - padT, mx = Math.max(...cnt, 1), bw = pw / bins;
+  const X = v => padL + v / max * pw, Y = v => padT + ph - v / mx * ph;
+  cnt.forEach((v, i) => { const x = padL + i * bw + 1, y = Y(v); c.fillStyle = css("--accent"); c.globalAlpha = .35 + .65 * (i / bins); c.beginPath(); c.roundRect(x, y, bw - 2, padT + ph - y, [3, 3, 0, 0]); c.fill(); c.globalAlpha = 1; });
+  const p25 = pct(e, .25), p90 = pct(e, .9);
+  [[p25, "遅い瞬間(下位25%)", css("--muted")], [p90, "速い瞬間(上位10%)", css("--beat")]].forEach(([v, lab, col], i) => { c.strokeStyle = col; c.lineWidth = 2; c.setLineDash([4, 3]); c.beginPath(); c.moveTo(X(v), padT); c.lineTo(X(v), padT + ph); c.stroke(); c.setLineDash([]); c.fillStyle = col; c.textAlign = i ? "right" : "left"; c.fillText(lab, X(v) + (i ? -4 : 4), padT + 12); });
+  c.fillStyle = css("--muted"); c.textAlign = "left"; c.fillText("弱い →", padL, H - 8); c.textAlign = "right"; c.fillText("→ 強い", W - 10, H - 8);
+  c.fillStyle = css("--ink"); c.font = `700 12px ${css("--f-body")}`; c.textAlign = "left"; c.fillText(`速い瞬間は遅い瞬間の ${(p90 / Math.max(p25, .02)).toFixed(1)}倍(メリハリの計測値)`, padL, 16);
+}
+
 /* beat times are needed for drawing; store compactly */
 const _build = buildRecord;
 buildRecord = function (m, o) { const r = _build(m, o); r.beatTimes = o.audio ? o.audio.beats.filter(b => b >= o.t0 - 0.01 && b <= o.t1 + 0.01).map(r3) : []; return r; };
@@ -1506,16 +1604,23 @@ async function runCoach(rec, id, btn) {
   const host = btn.closest(".panel"), out = host.querySelector("[data-coachtext]"), note = host.querySelector("[data-coachnote]");
   const token = sb ? (await sb.auth.getSession().catch(() => null))?.data?.session?.access_token : null;
   if (!token) { note.textContent = "AIコーチはログイン中だけ使えます。"; return; }
-  btn.disabled = true; note.textContent = "考え中…(10〜20秒)";
-  const payload = { タイトル: rec.title, ダンサー: rec.dancer, 曲: rec.song, BPM: rec.bpm, 人数: rec.people, 秒数: rec.duration,
-    スコア: Object.fromEntries(METRICS.map(m => [m.name, rec.scores[m.key]])), 総合: rec.scores.total,
-    ダンサー別: rec.dancers, 決めの回数: rec.hits.length, 拍に乗った決め: rec.onBeat };
-  const prompt = `あなたはダンス講師です。姿勢推定(YOLO-Pose)で算出した練習動画の数値を読み、日本語でコメントしてください。
-指標の意味: 動きの大きさ=関節の速さ、メリハリ=速い動きと止めの差、音ハメ=止め・決めが拍に乗った割合、可動域=手足の届く範囲、左右バランス=左右の動き量の差、揃い=複数人の関節角度の一致度。いずれも0〜100。nullは未計測。
-出力形式(見出しは【】、各2〜3行、合計350字以内、です・ます調、数値に触れる):
-【良い点】
-【伸ばす点】
-【次の練習メニュー】(具体的なドリルを2つ)
+  btn.disabled = true; note.textContent = "考え中…(20〜40秒)";
+  const facts = coachFacts(rec);
+  const payload = { タイトル: rec.title, ダンサー: rec.dancer, 曲: rec.song, BPM: rec.bpm, 人数: rec.people, 秒数: rec.duration, 解析範囲: `${rec.start}〜${rec.end}秒`,
+    スコア: Object.fromEntries(METRICS.map(m => [m.name, rec.scores[m.key]])), 総合: rec.scores.total, ...facts };
+  const prompt = `あなたは経験豊富なダンス講師です。姿勢推定(YOLO-Pose、関節17点)で練習動画を数値化したデータを読み、生徒と保護者に渡す「講評シート」を日本語で書いてください。
+指標の意味と換算: 動きの大きさ=関節の平均速度(身長/秒。0.6で約63点)、メリハリ=速い瞬間(上位10%)÷遅い瞬間(下位25%)(1.2倍で0点、4.5倍で100点)、音ハメ=動きを止めた「決め」が拍の±判定窓に入った割合(偶然分を引いて換算)、可動域=手首・足首が腰から届いた範囲(身長比。0.3で0点、2.5で100点)、左右バランス=左右の動き量の比(1.0で100点)、揃い=関節角度の相関(0.8以上で100点)。点数は0〜100、nullは未計測。
+「拍との関係」の平均ズレはプラスが遅れ、マイナスが走り。「時間帯別」は区間ごとの動きの強さ(全体平均=100%)と決めの数。
+書き方: です・ます調。必ず具体的な数値(点数・計測値・秒数・ms)に触れる。抽象的な褒め言葉だけの行は書かない。データに無いことは書かない(未計測は未計測と書く)。合計900〜1100字。
+出力形式(見出しは【】のみ。箇条書きは「・」):
+【総合評価】2〜3行。いちばんの強みと、いちばんの課題を数値つきで。
+【指標ごとの読み解き】6指標それぞれ1行。「点数(計測値)→ 何を意味するか → 伸ばすなら何を変えるか」。
+【時間帯ごとの指摘】区間(秒)ごとに1行。動きが落ちた区間、決めが拍から外れた区間、良かった区間を秒数つきで。
+${rec.dancers.length > 1 ? "【ダンサー別】各ダンサー1行。誰が引っ張り、誰が遅れているか、揃いの崩れはどこか。" : ""}
+${facts.前回 ? "【前回との変化】上がった指標・下がった指標を点数差で。" : ""}
+${facts.見本との比較 ? "【見本との比較】一致度・タイミング・部位別のズレから、見本に近づけるための1番の修正点。" : ""}
+【次の練習メニュー】3つ。各「目的 / やり方(具体的に) / 回数か時間」。
+【次回の目標数値】指標を2〜3つ選び、現在値→目標値と、その理由。
 データ: ${JSON.stringify(payload)}`;
   try {
     const r = await fetch("/api/coach", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + token }, body: JSON.stringify({ prompt }) });

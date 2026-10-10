@@ -12,7 +12,7 @@
 const SUPABASE_URL = "https://xnjcanoibshixxcjejii.supabase.co";
 const SUPABASE_KEY = "sb_publishable_A1rVNffy4RtpYCPCKD4PDA_Dc3vCRos";
 const API_URL = "https://api.anthropic.com/v1/messages";
-const MAX_PROMPT_CHARS = 20000;
+const MAX_PROMPT_CHARS = 60000;
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
 
@@ -47,10 +47,10 @@ async function coach(request, env) {
     },
     body: JSON.stringify({
       model: env.COACH_MODEL || "claude-opus-5-5",
-      max_tokens: 2048,
+      max_tokens: 4096,
       fallbacks: "default",
-      output_config: { effort: "low" },
-      system: "あなたはダンススタジオの講師です。生徒の練習動画を姿勢推定で数値化したデータを読み、日本語で短く具体的にコメントします。",
+      output_config: { effort: "medium" },
+      system: "あなたはダンススタジオの講師です。生徒の練習動画を姿勢推定で数値化したデータを読み、数値に基づいて具体的に、日本語で講評します。データに無いことは書きません。",
       messages: [{ role: "user", content: prompt }],
     }),
   });
