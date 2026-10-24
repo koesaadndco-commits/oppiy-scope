@@ -200,6 +200,10 @@ table.t td.n{font-family:var(--f-mono);text-align:right}
 .why .how{color:var(--muted);font-size:12px;line-height:1.5}
 .why td.m{font-family:var(--f-mono);white-space:nowrap}
 .printhead{display:none}
+.gate-legal{font-size:11px}.gate-legal a{color:var(--muted)}
+.tenantchip{max-width:14em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tenantsel{background:var(--surface2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 8px;font:inherit;font-size:12px}
+.sitefoot{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin:40px 0 10px;font-size:12px}.sitefoot a{color:var(--muted);text-decoration:none}.sitefoot a:hover{color:var(--ink)}
 html.print{color-scheme:light;--bg:#fff;--bg2:#fff;--surface:#fff;--surface2:#f1eef5;--ink:#141018;--muted:#5d5568;--line:#d8d2e2;--accent:#d61c6a;--accent2:#b86f00;--accent-soft:#fde4ee;--beat:#0d8fa0;--beat-soft:#dff6f9;--good:#1f9b57;--warn:#9a6a00;--bad:#d33;--stage:#fff;--stage-ink:#141018}
 @media print{
   body.printing *{visibility:hidden}
@@ -228,6 +232,7 @@ html.print{color-scheme:light;--bg:#fff;--bg2:#fff;--surface:#fff;--surface2:#f1
       <label class="f"><span class="lab">パスワード</span><input id="gPass" type="password" placeholder="••••••••" autocomplete="current-password"></label>
       <button class="btn stagein" type="submit">STAGE IN</button>
       <p class="gate-note" id="gateNote">登録済みのメールアドレスとパスワードで入ります。</p>
+      <p class="gate-note gate-legal">STAGE IN を押すと <a href="/legal/terms.html" target="_blank" rel="noopener">利用規約</a> と <a href="/legal/privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a> に同意したことになります。</p>
     </form>
   </div>
 </div>
@@ -241,6 +246,8 @@ html.print{color-scheme:light;--bg:#fff;--bg2:#fff;--surface:#fff;--surface2:#f1
         <button role="tab" id="tab-history" aria-selected="false" data-view="history">記録</button>
         <button role="tab" id="tab-trend" aria-selected="false" data-view="trend">推移</button>
       </nav>
+      <select class="tenantsel hidden" id="tenantSel" aria-label="スタジオを切り替え"></select>
+      <span class="chip tenantchip hidden" id="tenantChip"></span>
       <button class="logout" id="logoutBtn">ログアウト</button>
     </div>
   </header>
@@ -349,6 +356,7 @@ html.print{color-scheme:light;--bg:#fff;--bg2:#fff;--surface:#fff;--surface2:#f1
       <div class="tablewrap"><table class="t" id="trendTable"></table></div>
     </div>
   </section>
+  <footer class="sitefoot"><a href="/legal/terms.html">利用規約</a><a href="/legal/privacy.html">プライバシーポリシー</a><a href="/legal/tokushoho.html">特定商取引法に基づく表記</a><a href="/legal/licenses.html">ライセンス</a></footer>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.wasm.min.js"></script>
@@ -384,6 +392,7 @@ const LEFT = [5,7,9,11,13,15], RIGHT = [6,8,10,12,14,16];
 /* ---------- state ---------- */
 let records = [];         // saved analyses (from db or memory)
 let db = null, user = null, canWrite = true, dbReady = false;
+let tenants = null, tenant = null;   // 所属スタジオ(テナント)。null = テナント機能なし(旧DB)
 let videoFile = null, current = null, frames = [], analyzing = false, stopFlag = false;
 let session = null;
 const vid = $("#vid"), view = $("#view"), vctx = view.getContext("2d");
@@ -473,7 +482,7 @@ $("#gateForm").addEventListener("submit", async e => {
   gateNote.textContent = gateNoteDefault; $("#gPass").value = "";
   closeGate(); await loadRecords();
 });
-$("#logoutBtn").addEventListener("click", async () => { if (sb) await sb.auth.signOut().catch(() => {}); records = []; renderAll(); openGate(); });
+$("#logoutBtn").addEventListener("click", async () => { if (sb) await sb.auth.signOut().catch(() => {}); records = []; tenant = null; tenants = null; $("#tenantChip").classList.add("hidden"); $("#tenantSel").classList.add("hidden"); renderAll(); openGate(); });
 
 /* ---------- tabs ---------- */
 function showView(name) {
@@ -1720,7 +1729,7 @@ function makeDb(client) {
   const table = () => client.from("analyses");
   const doc = id => ({
     id,
-    async set(data) { const { error } = await table().insert({ id, data }); if (error) throw error; records.unshift({ ...data, id }); renderAll(); },
+    async set(data) { const row = { id, data }; if (tenant) row.tenant_id = tenant.id; const { error } = await table().insert(row); if (error) throw error; records.unshift({ ...data, id }); renderAll(); },
     async update(patch) {
       const cur = records.find(r => r.id === id) || {};
       const merged = { ...cur, ...patch }; delete merged.id;
@@ -1731,12 +1740,31 @@ function makeDb(client) {
   });
   return { collection: name => { if (name !== "analyses") throw new Error("unknown collection " + name); return { doc: id => doc(id || crypto.randomUUID()) }; } };
 }
+/* テナント:所属スタジオの一覧を読み、1つ目(または前回選んだもの)を使う。テーブルが無い旧DBでは従来どおり全件 */
+async function loadTenants() {
+  tenants = null; tenant = null;
+  const { data, error } = await sb.from("tenants").select("id, name, plan, status").order("created_at");
+  if (error) { if (error.code !== "42P01") console.warn("tenants", error); return; }
+  tenants = data;
+  let want = null; try { want = localStorage.getItem("oppiy-tenant"); } catch {}
+  tenant = tenants.find(t => t.id === want) || tenants[0] || null;
+  const chip = $("#tenantChip"), sel = $("#tenantSel");
+  chip.classList.toggle("hidden", !tenant || tenants.length > 1); if (tenant) chip.textContent = tenant.name;
+  sel.classList.toggle("hidden", tenants.length < 2);
+  if (tenants.length > 1) { sel.innerHTML = tenants.map(t => `<option value="${esc(t.id)}" ${t.id === tenant.id ? "selected" : ""}>${esc(t.name)}</option>`).join(""); }
+}
+$("#tenantSel").addEventListener("change", async e => { tenant = tenants.find(t => t.id === e.target.value) || tenant; try { localStorage.setItem("oppiy-tenant", tenant.id); } catch {} await loadRecords(); });
 async function loadRecords() {
   if (!sb) return;
-  const { data, error } = await sb.from("analyses").select("id, data").order("created_at", { ascending: false }).limit(500);
+  await loadTenants();
+  if (tenants && !tenant) { dbReady = true; canWrite = false; records = []; showBanner("所属するスタジオが設定されていません。管理者にアカウントの登録を依頼してください。"); renderAll(); return; }
+  if (tenant && tenant.status !== "active") { canWrite = false; showBanner(`「${tenant.name}」の契約は現在停止中のため、閲覧のみできます。`); }
+  let q = sb.from("analyses").select("id, data");
+  if (tenant) q = q.eq("tenant_id", tenant.id);
+  const { data, error } = await q.order("created_at", { ascending: false }).limit(500);
   dbReady = true;
   if (error) { showBanner("記録を読み込めませんでした。ページを開き直してください。"); renderAll(); return; }
-  hideBanner();
+  if (!tenant || tenant.status === "active") hideBanner();
   records = data.map(r => ({ ...r.data, id: r.id }));
   renderAll();
 }

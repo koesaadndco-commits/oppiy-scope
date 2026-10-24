@@ -19,7 +19,7 @@
 - `.env*`・APIキー・Service Role Key を含めていない
 - フロント(`public/index.html`)に書くのは Supabase の anon(publishable)key のみ
 - Claude API はブラウザから呼ばない。必ず Workers 経由
-- 全テーブルで RLS 有効、本人の記録しか読めない
+- 全テーブルで RLS 有効、自分の所属テナント(スタジオ)の記録しか読めない
 - 動画そのものは保存しない(端末内で解析のみ)
 
 ## ファイル
@@ -32,6 +32,7 @@
 | `src/worker.js` | Worker:静的配信 + AIコーチ API。Secret `ANTHROPIC_API_KEY` を Cloudflare 側に登録 |
 | `wrangler.jsonc` | Workers 設定(assets = `public/`) |
 | `supabase/migrations/` | DBマイグレーション(本番は管理画面から直接変更しない) |
+| `public/legal/` | 利用規約・プライバシーポリシー・特商法・ライセンス(【…】は未記入箇所) |
 
 ## 環境
 

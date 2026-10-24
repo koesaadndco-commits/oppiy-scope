@@ -13,6 +13,7 @@ YOLO-Pose(YOLOv8n-pose)でダンス動画をブラウザ内で解析し、
 | `src/worker.js` | Worker 本体:`public/` の配信 + AIコーチ API(Claude API の中継) |
 | `wrangler.jsonc` | Cloudflare Workers の設定 |
 | `supabase/migrations/` | DB マイグレーション |
+| `public/legal/` | 利用規約・プライバシーポリシー・特商法表記・ライセンス表記 |
 
 Cloudflare Workers(Workers Builds)が GitHub への push を検知して自動デプロイします。
 `file://` で直接開くと fetch が失敗するので、ローカル確認は `npx serve .` などで。
@@ -43,6 +44,24 @@ Cloudflare Workers(Workers Builds)が GitHub への push を検知して自動�
 - 必要な Secret(Cloudflare → Workers & Pages → oppiy-scope → 設定 → 変数とシークレット → 追加 → シークレット): `ANTHROPIC_API_KEY`
 - 任意: `COACH_MODEL` でモデルを変えられる
 - 未登録のときはアプリ側に「AIコーチの設定が未完了です」と出る(他の機能は動く)
+
+## テナント(スタジオ単位のデータ分離)
+
+- `tenants`(契約の単位)/ `memberships`(ユーザーの所属と役割 owner / admin / member)/ `analyses.tenant_id`
+- RLS は「自分が属するテナントの記録だけ」。他スタジオのデータは SQL でも見えない
+- 新しいスタジオの追加は Supabase 管理画面で:Authentication → Users でユーザー作成 → SQL で `tenants` に1行、`memberships` に(tenant_id, user_id, 'owner')を1行
+- 停止したい契約は `tenants.status = 'suspended'`(閲覧のみになり、保存できなくなる)
+- 複数テナントに属するユーザーにはヘッダーに切替メニューが出る
+- 定義は `supabase/migrations/20261010000000_tenants.sql`
+
+## 法的ページ(`public/legal/`)
+
+利用規約・プライバシーポリシー・特定商取引法に基づく表記・ライセンス表記。本文中の **【…】** が未記入の箇所(会社名・住所・代表者・連絡先・料金・解約条件・管轄裁判所・AGPL の対応方針)。公開前に埋めて、弁護士等の確認を受けること。
+
+## 運用上の注意
+
+- Supabase の無料プロジェクトは **1週間使われないと一時停止**し、ログインも保存もできなくなる(「Database is possibly not accessible」)。販売する段階では Pro プラン(自動停止なし・日次バックアップ・ブランチ機能)にする
+- YOLOv8 は AGPL-3.0。社外提供の前に「ソース公開」か「Ultralytics 商用ライセンス」を決める(`public/legal/licenses.html` 参照)
 
 ## 保存しているデータ(analyses の1件)
 
