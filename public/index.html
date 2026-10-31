@@ -366,8 +366,8 @@ html.print{color-scheme:light;--bg:#fff;--bg2:#fff;--surface:#fff;--surface2:#f1
 "use strict";
 /* ---------- Supabase(裏側:DB / ログイン)----------
    publishable key はブラウザに置いてよい公開キー。Service Role Key は絶対にここに書かない。 */
-const SUPABASE_URL = "https://xnjcanoibshixxcjejii.supabase.co";
-const SUPABASE_KEY = "sb_publishable_A1rVNffy4RtpYCPCKD4PDA_Dc3vCRos";
+const SUPABASE_URL = "https://ibtpidqkcxmotlanfgsy.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Liqo684Ht-oMGjSdzq2AaA_nio5kQ7O";
 const sb = window.supabase?.createClient ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -1726,7 +1726,7 @@ function renderTrend() {
 function showBanner(msg) { $("#dbBanner").textContent = msg; $("#dbBanner").classList.remove("hidden"); }
 function hideBanner() { $("#dbBanner").classList.add("hidden"); }
 function makeDb(client) {
-  const table = () => client.from("analyses");
+  const table = () => client.from("oppiy_analyses");
   const doc = id => ({
     id,
     async set(data) { const row = { id, data }; if (tenant) row.tenant_id = tenant.id; const { error } = await table().insert(row); if (error) throw error; records.unshift({ ...data, id }); renderAll(); },
@@ -1743,7 +1743,7 @@ function makeDb(client) {
 /* テナント:所属スタジオの一覧を読み、1つ目(または前回選んだもの)を使う。テーブルが無い旧DBでは従来どおり全件 */
 async function loadTenants() {
   tenants = null; tenant = null;
-  const { data, error } = await sb.from("tenants").select("id, name, plan, status").order("created_at");
+  const { data, error } = await sb.from("oppiy_tenants").select("id, name, plan, status").order("created_at");
   if (error) { if (error.code !== "42P01") console.warn("tenants", error); return; }
   tenants = data;
   let want = null; try { want = localStorage.getItem("oppiy-tenant"); } catch {}
@@ -1759,7 +1759,7 @@ async function loadRecords() {
   await loadTenants();
   if (tenants && !tenant) { dbReady = true; canWrite = false; records = []; showBanner("所属するスタジオが設定されていません。管理者にアカウントの登録を依頼してください。"); renderAll(); return; }
   if (tenant && tenant.status !== "active") { canWrite = false; showBanner(`「${tenant.name}」の契約は現在停止中のため、閲覧のみできます。`); }
-  let q = sb.from("analyses").select("id, data");
+  let q = sb.from("oppiy_analyses").select("id, data");
   if (tenant) q = q.eq("tenant_id", tenant.id);
   const { data, error } = await q.order("created_at", { ascending: false }).limit(500);
   dbReady = true;

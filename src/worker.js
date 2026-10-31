@@ -9,8 +9,8 @@
 
    npm のビルド工程を持たない静的サイトなので、SDK ではなく fetch で直接 Messages API を呼ぶ。 */
 
-const SUPABASE_URL = "https://xnjcanoibshixxcjejii.supabase.co";
-const SUPABASE_KEY = "sb_publishable_A1rVNffy4RtpYCPCKD4PDA_Dc3vCRos";
+const SUPABASE_URL = "https://ibtpidqkcxmotlanfgsy.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Liqo684Ht-oMGjSdzq2AaA_nio5kQ7O";
 const API_URL = "https://api.anthropic.com/v1/messages";
 const MAX_PROMPT_CHARS = 60000;
 
