@@ -29,13 +29,14 @@ Cloudflare Workers(Workers Builds)が GitHub への push を検知して自動�
 
 ## 裏側(Supabase)
 
-- プロジェクト: `oppiy-scope`(東京 `ap-northeast-1`)
-- テーブル: `analyses`(`id` uuid / `user_id` / `created_at` / `data` jsonb に記録を丸ごと)。定義は `supabase/migrations/`
-- RLS: ログイン済みユーザーのみ読み書き可。匿名は不可。スタジオ内共有ツールの前提で、ログイン済み同士は互いの記録を見られる
-- ログイン: Supabase Auth のメール+パスワード。**セルフ登録は無効**にし、ユーザーは管理画面(Authentication → Users → Add user)で追加する
+- プロジェクト: `KOESA Project`(`ibtpidqkcxmotlanfgsy`、東京 `ap-northeast-1`)。社内の他アプリと1プロジェクトを共有しているので、このアプリのテーブル・関数名はすべて `oppiy_` 始まり
+- 旧プロジェクト `oppiy-scope`(`xnjcanoibshixxcjejii`)は無料枠の「有効プロジェクト2つまで」に掛かって停止。記録は `oppiy_analyses` に移す
+- テーブル: `oppiy_analyses`(`id` uuid / `user_id` / `tenant_id` / `created_at` / `data` jsonb に記録を丸ごと)。定義は `supabase/migrations/20261031000000_oppiy_analyses_koesa.sql`(それ以前の2本は旧プロジェクト向けの履歴)
+- RLS: 自分が属するテナント(スタジオ)の記録だけ読み書き可。匿名・他アプリのユーザーは不可。同じスタジオのメンバー同士は互いの記録を見られる
+- ログイン: Supabase Auth のメール+パスワード(KOESA Project の Auth を他アプリと共用)。ユーザーは管理画面(Authentication → Users → Add user)で追加し、`oppiy_memberships` に所属を入れる(入れないと「所属するスタジオが設定されていません」になる)
 - `public/index.html` 先頭の `SUPABASE_URL` / `SUPABASE_KEY` は公開してよい publishable key。Service Role Key は絶対に置かない
 
-`public/index.html` 側は `db.collection("analyses").doc(id).set / update / delete` の形を `makeDb()` で保っているので、保存系の呼び出し元(`saveBtn`、`confirmDelete`、`clearSamples`、`wireCompare`、`data-refmark`)は触っていない。
+`public/index.html` 側は `db.collection("analyses")`(実テーブルは `oppiy_analyses`)`.doc(id).set / update / delete` の形を `makeDb()` で保っているので、保存系の呼び出し元(`saveBtn`、`confirmDelete`、`clearSamples`、`wireCompare`、`data-refmark`)は触っていない。
 
 ## AIコーチ(Cloudflare Workers)
 
@@ -47,12 +48,12 @@ Cloudflare Workers(Workers Builds)が GitHub への push を検知して自動�
 
 ## テナント(スタジオ単位のデータ分離)
 
-- `tenants`(契約の単位)/ `memberships`(ユーザーの所属と役割 owner / admin / member)/ `analyses.tenant_id`
+- `oppiy_tenants`(契約の単位)/ `oppiy_memberships`(ユーザーの所属と役割 owner / admin / member)/ `oppiy_analyses.tenant_id`
 - RLS は「自分が属するテナントの記録だけ」。他スタジオのデータは SQL でも見えない
-- 新しいスタジオの追加は Supabase 管理画面で:Authentication → Users でユーザー作成 → SQL で `tenants` に1行、`memberships` に(tenant_id, user_id, 'owner')を1行
-- 停止したい契約は `tenants.status = 'suspended'`(閲覧のみになり、保存できなくなる)
+- 新しいスタジオの追加は Supabase 管理画面で:Authentication → Users でユーザー作成 → SQL で `oppiy_tenants` に1行、`oppiy_memberships` に(tenant_id, user_id, 'owner')を1行
+- 停止したい契約は `oppiy_tenants.status = 'suspended'`(閲覧のみになり、保存できなくなる)
 - 複数テナントに属するユーザーにはヘッダーに切替メニューが出る
-- 定義は `supabase/migrations/20261010000000_tenants.sql`
+- 定義は `supabase/migrations/20261031000000_oppiy_analyses_koesa.sql`
 
 ## 法的ページ(`public/legal/`)
 

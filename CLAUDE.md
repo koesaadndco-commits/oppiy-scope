@@ -6,7 +6,7 @@
 
 - **GitHub** = 司令塔:ソース・マイグレーション・変更履歴の起点
 - **Cloudflare Workers** = 表側:`public/` の配信・SSL・AIコーチのAPI中継(`src/worker.js`、設定は `wrangler.jsonc`)
-- **Supabase** = 裏側:DB(`analyses`)・Auth
+- **Supabase** = 裏側:DB(`oppiy_analyses` / `oppiy_tenants` / `oppiy_memberships`)・Auth。プロジェクトは社内共有の `KOESA Project`(`ibtpidqkcxmotlanfgsy`)。このアプリのテーブル・関数名は必ず `oppiy_` 始まりにする(他アプリと同居しているため)
 - **Claude Code** = 開発担当
 
 ## 流れ
